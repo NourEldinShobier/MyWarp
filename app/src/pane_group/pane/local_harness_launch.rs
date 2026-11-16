@@ -29,21 +29,26 @@ pub(super) fn normalize_local_child_harness(harness_type: &str) -> Option<Harnes
 
 pub(super) fn validate_local_harness_shell(shell_type: Option<ShellType>) -> Result<(), String> {
     match shell_type {
-        Some(ShellType::Bash) | Some(ShellType::Zsh) | Some(ShellType::Fish) => Ok(()),
-        Some(ShellType::PowerShell) => Err(
-            "Local child harnesses currently require bash, zsh, or fish; PowerShell is not supported."
-                .to_string(),
-        ),
+        Some(ShellType::Bash | ShellType::Zsh | ShellType::Fish | ShellType::PowerShell) => Ok(()),
         None => Err(
-            "Local child harnesses currently require a detected bash, zsh, or fish session."
+            "Local child harnesses currently require a detected bash, zsh, fish, or PowerShell session."
                 .to_string(),
         ),
     }
 }
 
-pub(super) fn build_local_claude_child_command(prompt: &str) -> String {
+/// Quotes `prompt` as a single literal argument for the given shell. POSIX
+/// quoting (`'''`) is invalid in PowerShell, which doubles the single quote.
+fn quote_prompt(prompt: &str, shell_type: ShellType) -> String {
+    match shell_type {
+        ShellType::PowerShell => format!("'{}'", prompt.replace(''', "''")),
+        _ => shell_quote(prompt).into_owned(),
+    }
+}
+
+pub(super) fn build_local_claude_child_command(prompt: &str, shell_type: ShellType) -> String {
     let session_id = Uuid::new_v4();
-    let quoted_prompt = shell_quote(prompt);
+    let quoted_prompt = quote_prompt(prompt, shell_type);
     // Local child harness panes are launched off-screen. We intentionally skip
     // Claude's own permission prompts here so the child can start unattended
     // instead of hanging on an approval UI the user cannot see in that hidden
@@ -51,8 +56,8 @@ pub(super) fn build_local_claude_child_command(prompt: &str) -> String {
     format!("claude --session-id {session_id} --dangerously-skip-permissions {quoted_prompt}")
 }
 
-pub(super) fn build_local_opencode_child_command(prompt: &str) -> String {
-    let quoted_prompt = shell_quote(prompt);
+pub(super) fn build_local_opencode_child_command(prompt: &str, shell_type: ShellType) -> String {
+    let quoted_prompt = quote_prompt(prompt, shell_type);
     format!("opencode --prompt {quoted_prompt}")
 }
 
@@ -82,6 +87,7 @@ pub(super) async fn prepare_local_harness_child_launch(
         });
     };
     validate_local_harness_shell(shell_type)?;
+    let shell_type = shell_type.expect("validated above");
     let command = match harness {
         Harness::Oz => unreachable!("normalize_local_child_harness filters out Oz"),
         Harness::Unknown => unreachable!("normalize_local_child_harness filters out Unknown"),
@@ -109,12 +115,12 @@ pub(super) async fn prepare_local_harness_child_launch(
                 }
             }
 
-            build_local_claude_child_command(&prompt)
+            build_local_claude_child_command(&prompt, shell_type)
         }
         Harness::OpenCode => {
             validate_cli_installed("opencode", Some("https://opencode.ai/docs"))
                 .map_err(|error: AgentDriverError| error.to_string())?;
-            build_local_opencode_child_command(&prompt)
+            build_local_opencode_child_command(&prompt, shell_type)
         }
         Harness::Gemini => unreachable!("normalize_local_child_harness filters out Gemini"),
     };

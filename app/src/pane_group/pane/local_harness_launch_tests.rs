@@ -43,24 +43,22 @@ fn normalize_local_child_harness_rejects_unsupported_values() {
 
 #[test]
 fn validate_local_harness_shell_accepts_supported_shells() {
-    assert_eq!(validate_local_harness_shell(Some(ShellType::Bash)), Ok(()));
-    assert_eq!(validate_local_harness_shell(Some(ShellType::Zsh)), Ok(()));
-    assert_eq!(validate_local_harness_shell(Some(ShellType::Fish)), Ok(()));
+    for shell in [
+        ShellType::Bash,
+        ShellType::Zsh,
+        ShellType::Fish,
+        ShellType::PowerShell,
+    ] {
+        assert_eq!(validate_local_harness_shell(Some(shell)), Ok(()));
+    }
 }
 
 #[test]
-fn validate_local_harness_shell_rejects_unsupported_shells() {
-    assert_eq!(
-        validate_local_harness_shell(Some(ShellType::PowerShell)),
-        Err(
-            "Local child harnesses currently require bash, zsh, or fish; PowerShell is not supported."
-                .to_string()
-        )
-    );
+fn validate_local_harness_shell_rejects_unknown_shell() {
     assert_eq!(
         validate_local_harness_shell(None),
         Err(
-            "Local child harnesses currently require a detected bash, zsh, or fish session."
+            "Local child harnesses currently require a detected bash, zsh, fish, or PowerShell session."
                 .to_string()
         )
     );
@@ -68,16 +66,27 @@ fn validate_local_harness_shell_rejects_unsupported_shells() {
 
 #[test]
 fn build_local_claude_child_command_quotes_the_prompt() {
-    let command = build_local_claude_child_command("hello world");
+    let command = build_local_claude_child_command("hello world", ShellType::Bash);
 
     assert!(command.starts_with("claude --session-id "));
     assert!(command.ends_with(" --dangerously-skip-permissions 'hello world'"));
 }
 
 #[test]
+fn build_local_claude_child_command_quotes_the_prompt_for_powershell() {
+    let command = build_local_claude_child_command("it's $x", ShellType::PowerShell);
+
+    assert!(command.ends_with(" --dangerously-skip-permissions 'it''s $x'"));
+}
+
+#[test]
 fn build_local_opencode_child_command_quotes_the_prompt() {
     assert_eq!(
-        build_local_opencode_child_command("hello world"),
+        build_local_opencode_child_command("hello world", ShellType::Zsh),
         "opencode --prompt 'hello world'"
+    );
+    assert_eq!(
+        build_local_opencode_child_command("it's", ShellType::PowerShell),
+        "opencode --prompt 'it''s'"
     );
 }
