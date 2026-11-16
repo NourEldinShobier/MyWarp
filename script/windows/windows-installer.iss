@@ -116,12 +116,39 @@ Source: "..\..\app\assets\bundled\bootstrap\pwsh.ps1"; DestDir: "{app}"
 Source: "{#AssetsDir}\{#Arch}\dxcompiler.dll"; DestDir: "{app}"
 Source: "{#AssetsDir}\{#Arch}\dxil.dll"; DestDir: "{app}"
 Source: "{#TargetProfileDir}\resources\*"; DestDir: "{app}\resources"; Flags: ignoreversion recursesubdirs
+#if ReleaseChannel == "oss"
+; Compiled by bundle.ps1 from warp-launcher\main.rs; shipped under both names.
+Source: "warp-launcher\zap.exe"; DestDir: "{app}\bin"; DestName: "zap.exe"; Flags: ignoreversion
+Source: "warp-launcher\zap.exe"; DestDir: "{app}\bin"; DestName: "warp.exe"; Flags: ignoreversion
+#endif
 
 [Registry]
 Root: HKCU; Subkey: "SOFTWARE\Zap.dev\{#MyAppName}"; Flags: uninsdeletekey
 ; cleanup "Open Zap Here" registry entries
 Root: HKA; Subkey: "Software\Classes\Directory\shell\{#MyAppName}"; Flags: deletekey
 Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\{#MyAppName}"; Flags: deletekey
+#if ReleaseChannel == "oss"
+Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\zap.exe"; ValueType: string; ValueName: ""; ValueData: "{app}\bin\zap.exe"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\warp.exe"; ValueType: string; ValueName: ""; ValueData: "{app}\bin\warp.exe"; Flags: uninsdeletekey
+; Remove verbs written by older installers
+Root: HKA; Subkey: "Software\Classes\Directory\shell\{#MyAppName}Tab"; Flags: deletekey
+Root: HKA; Subkey: "Software\Classes\Directory\shell\{#MyAppName}Window"; Flags: deletekey
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\{#MyAppName}Tab"; Flags: deletekey
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\{#MyAppName}Window"; Flags: deletekey
+; "Open in Zap" (window) and "Open in Zap (new tab)" via the launcher
+Root: HKA; Subkey: "Software\Classes\Directory\shell\ZapOpen"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Open in Zap"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Directory\shell\ZapOpen"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\icon.ico"",0"
+Root: HKA; Subkey: "Software\Classes\Directory\shell\ZapOpen\command"; ValueType: string; ValueName: ""; ValueData: """{app}\bin\zap.exe"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Directory\shell\ZapOpenTab"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Open in Zap (new tab)"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Directory\shell\ZapOpenTab"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\icon.ico"",0"
+Root: HKA; Subkey: "Software\Classes\Directory\shell\ZapOpenTab\command"; ValueType: string; ValueName: ""; ValueData: """{app}\bin\zap.exe"" --tab ""%1"""
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\ZapOpen"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Open in Zap"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\ZapOpen"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\icon.ico"",0"
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\ZapOpen\command"; ValueType: string; ValueName: ""; ValueData: """{app}\bin\zap.exe"" ""%V"""
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\ZapOpenTab"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Open in Zap (new tab)"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\ZapOpenTab"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\icon.ico"",0"
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\ZapOpenTab\command"; ValueType: string; ValueName: ""; ValueData: """{app}\bin\zap.exe"" --tab ""%V"""
+#else
 ; Add "Open Zap in new tab" to directory context menu
 Root: HKA; Subkey: "Software\Classes\Directory\shell\{#MyAppName}Tab"; ValueType: string; ValueName: ""; ValueData: "Open {#MyAppName} in new tab"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\Directory\shell\{#MyAppName}Tab"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\icon.ico"
@@ -138,6 +165,7 @@ Root: HKA; Subkey: "Software\Classes\Directory\shell\{#MyAppName}Window\command"
 Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\{#MyAppName}Window"; ValueType: string; ValueName: ""; ValueData: "Open {#MyAppName} in new window"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\{#MyAppName}Window"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\icon.ico"
 Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\{#MyAppName}Window\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""{#MyAppName}://action/new_window?path=%V"""
+#endif
 
 [Tasks]
 Name: addToPath; Description: "Add Zap to PATH"

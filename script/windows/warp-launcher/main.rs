@@ -1,14 +1,12 @@
-// Tiny `warp.exe` that opens a Warp OSS window (or tab with `--tab`) in a directory.
-// Usable from the Explorer address bar, Win+R, any shell, and the Explorer context menu.
-// Lives in `<app>\bin` and starts `<app>\warp-oss.exe` with a `warposs://action/...` link.
+//! Windows shell launcher: `zap.exe [--tab] [path]` opens Zap via its URL scheme.
+//! Compiled by bundle.ps1 and installed as `bin\zap.exe` and `bin\warp.exe`.
 #![windows_subsystem = "windows"]
 
-use std::env;
-use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 
-const DETACHED_PROCESS: u32 = 0x0000_0008;
+const APP_EXE: &str = "zap-oss.exe";
+const URL_SCHEME: &str = "zap";
 
 fn percent_encode(s: &str) -> String {
     let mut out = String::new();
@@ -23,43 +21,41 @@ fn percent_encode(s: &str) -> String {
 }
 
 fn main() {
-    let mut tab = false;
-    let mut target: Option<String> = None;
-    for arg in env::args().skip(1) {
+    let mut new_tab = false;
+    let mut path = None;
+    for arg in std::env::args().skip(1) {
         if arg == "--tab" {
-            tab = true;
-        } else if target.is_none() {
-            target = Some(arg);
+            new_tab = true;
+        } else {
+            // A quoted `"C:\"` reaches us as `C:"` because `\"` escapes the quote, so strip it.
+            let arg = arg.trim_end_matches('"').to_string();
+            if !arg.is_empty() {
+                path = Some(arg);
+            }
         }
     }
 
-    let cwd = env::current_dir().ok();
-    let path: Option<PathBuf> = match target {
-        Some(raw) => {
-            // `"%V"` with a drive root arrives as `D:"` because `\"` escapes the quote.
-            let mut raw = raw.trim_end_matches('"').to_owned();
-            if raw.len() == 2 && raw.ends_with(':') {
-                raw.push('\\');
-            }
-            let p = PathBuf::from(raw);
-            if p.is_absolute() {
-                Some(p)
-            } else {
-                cwd.map(|c| c.join(&p)).or(Some(p))
-            }
-        }
-        None => cwd,
-    };
-
-    let exe = env::current_exe()
+    // The launcher lives in `<app>\bin`; the app executable is one level up.
+    let exe = std::env::current_exe()
         .ok()
-        .and_then(|e| e.parent().and_then(|bin| bin.parent()).map(|app| app.join("warp-oss.exe")));
-    let Some(exe) = exe else { return };
+        .and_then(|p| p.parent()?.parent().map(|d| d.join(APP_EXE)))
+        .unwrap_or_else(|| PathBuf::from(APP_EXE));
 
-    let mut url = format!("warposs://action/new_{}", if tab { "tab" } else { "window" });
-    if let Some(p) = path {
-        url.push_str("?path=");
-        url.push_str(&percent_encode(&p.to_string_lossy()));
+    let mut cmd = Command::new(exe);
+    if let Some(path) = path {
+        let mut p = PathBuf::from(path);
+        if p.is_relative() {
+            if let Ok(cwd) = std::env::current_dir() {
+                p = cwd.join(p);
+            }
+        }
+        let action = if new_tab { "new_tab" } else { "new_window" };
+        cmd.arg(format!(
+            "{URL_SCHEME}://action/{action}?path={}",
+            percent_encode(&p.to_string_lossy())
+        ));
     }
-    let _ = Command::new(exe).arg(url).creation_flags(DETACHED_PROCESS).spawn();
+    if cmd.spawn().is_err() {
+        std::process::exit(1);
+    }
 }

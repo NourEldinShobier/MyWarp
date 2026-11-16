@@ -240,6 +240,18 @@ if ($SIGN_TOOL_CMD) {
     $ISCC_ARGS += '/DSIGN_TOOL=1'
     $ISCC_ARGS += "/Scodesign=$SIGN_TOOL_CMD"
 }
+if ("$CHANNEL" -eq 'oss') {
+    Push-Location $WINDOWS_INSTALLER_DIR
+    try {
+        & rustc --edition 2021 -O -C panic=abort -C strip=symbols warp-launcher\main.rs -o warp-launcher\zap.exe
+        if (-Not $?) {
+            Write-Error "Failed to build zap launcher"
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+}
 & ISCC @ISCC_ARGS
 if (-Not $?) {
     Write-Error "Failed to build $APP_NAME installer"
