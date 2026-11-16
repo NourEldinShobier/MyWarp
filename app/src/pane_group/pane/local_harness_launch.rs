@@ -41,7 +41,7 @@ pub(super) fn validate_local_harness_shell(shell_type: Option<ShellType>) -> Res
 /// quoting (`'''`) is invalid in PowerShell, which doubles the single quote.
 fn quote_prompt(prompt: &str, shell_type: ShellType) -> String {
     match shell_type {
-        ShellType::PowerShell => format!("'{}'", prompt.replace(''', "''")),
+        ShellType::PowerShell => format!("'{}'", prompt.replace('\'', "''")),
         _ => shell_quote(prompt).into_owned(),
     }
 }
