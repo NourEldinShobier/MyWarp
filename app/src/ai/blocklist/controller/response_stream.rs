@@ -70,6 +70,8 @@ pub(crate) struct TitleGenParams {
     pub model_id: String,
     pub api_type: crate::settings::AgentProviderApiType,
     pub reasoning_effort: crate::settings::ReasoningEffortSetting,
+    pub extra_headers: Vec<(String, String)>,
+    pub conversation_id: String,
 }
 
 fn byop_dispatch_info(
@@ -117,6 +119,12 @@ fn byop_dispatch_info(
                     model_id: t_model_id,
                     api_type: t_provider.api_type,
                     reasoning_effort: t_effort,
+                    extra_headers: t_provider.extra_headers,
+                    conversation_id: params
+                        .conversation_token
+                        .as_ref()
+                        .map(|t| t.as_str().to_string())
+                        .unwrap_or_default(),
                 }
             },
         )
@@ -181,6 +189,8 @@ fn pending_title_generation_from_byop(
             model_id: title_gen.model_id.clone(),
             api_type: title_gen.api_type,
             reasoning_effort: title_gen.reasoning_effort,
+            extra_headers: title_gen.extra_headers.clone(),
+            conversation_id: title_gen.conversation_id.clone(),
         },
         user_query,
         task_id: byop.root_task_id.clone(),

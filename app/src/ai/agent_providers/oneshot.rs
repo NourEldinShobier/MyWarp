@@ -32,6 +32,10 @@ pub struct OneshotConfig {
     pub model_id: String,
     pub api_type: AgentProviderApiType,
     pub reasoning_effort: ReasoningEffortSetting,
+    /// provider 级自定义请求头。
+    pub extra_headers: Vec<(String, String)>,
+    /// 所属会话 id(空 = 无会话,不加 per-conversation 头)。
+    pub conversation_id: String,
 }
 
 /// One-shot 调用的可选参数。
@@ -78,6 +82,16 @@ fn build_oneshot_request(
                 chat_opts = chat_opts.with_reasoning_effort(effort);
             }
         }
+    }
+
+    let mut headers = cfg.extra_headers.clone();
+    chat_stream::add_opencode_session_header(
+        &mut headers,
+        &cfg.base_url,
+        Some(&cfg.conversation_id),
+    );
+    if !headers.is_empty() {
+        chat_opts = chat_opts.with_extra_headers(headers);
     }
 
     let max_chars = opts.max_chars.unwrap_or(DEFAULT_MAX_CHARS);
@@ -174,6 +188,8 @@ pub fn resolve_active_ai_oneshot(
         model_id,
         api_type: provider.api_type,
         reasoning_effort,
+        extra_headers: provider.extra_headers,
+        conversation_id: String::new(),
     })
 }
 
@@ -197,5 +213,7 @@ pub fn resolve_next_command_oneshot(
         model_id,
         api_type: provider.api_type,
         reasoning_effort,
+        extra_headers: provider.extra_headers,
+        conversation_id: String::new(),
     })
 }

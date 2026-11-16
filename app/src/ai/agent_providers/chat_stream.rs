@@ -2981,7 +2981,17 @@ pub(super) fn build_client(
     // 由入口 bin 注册:`bin/oss.rs` → "Zap";其它 channel 自带各自名称)。
     // 这样上游服务能识别请求来自哪个分支构建,后续若改名也会自动跟随。
     let mut headers = reqwest::header::HeaderMap::new();
-    if let Ok(value) = build_user_agent_header() {
+    let ua = if is_opencode_host(base_url) {
+        // OpenCode Go 要求形如 `zap/<version>` 的描述性 UA。
+        let ua = match warp_core::channel::ChannelState::app_version() {
+            Some(v) if !v.is_empty() => format!("zap/{v}"),
+            _ => "zap".to_owned(),
+        };
+        reqwest::header::HeaderValue::from_str(&ua)
+    } else {
+        build_user_agent_header()
+    };
+    if let Ok(value) = ua {
         headers.insert(reqwest::header::USER_AGENT, value);
     }
     let mut web_config = WebConfig {
@@ -3124,7 +3134,7 @@ fn build_chat_options(
     base_url: &str,
     model_id: &str,
     effort_setting: crate::settings::ReasoningEffortSetting,
-    extra_headers: Vec<(String, String)>,
+    mut extra_headers: Vec<(String, String)>,
     conversation_id: Option<&str>,
 ) -> ChatOptions {
     let mut opts = ChatOptions::default()
@@ -3246,11 +3256,39 @@ fn build_chat_options(
         );
         opts = opts.with_extra_body(json!({"enable_thinking": true}));
     }
+    add_opencode_session_header(&mut extra_headers, base_url, conversation_id);
     if !extra_headers.is_empty() {
         opts = opts.with_extra_headers(extra_headers);
     }
 
     opts
+}
+
+/// `opencode.ai` 或其子域(按 host 精确匹配,不做子串匹配)。
+pub(super) fn is_opencode_host(base_url: &str) -> bool {
+    url::Url::parse(base_url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+        .is_some_and(|h| h == "opencode.ai" || h.ends_with(".opencode.ai"))
+}
+
+/// OpenCode Go 要求稳定的 per-conversation `x-opencode-session` 头。
+/// 仅 opencode 主机、conversation id 非空、用户未自行设置同名头(大小写不敏感)时追加。
+pub(super) fn add_opencode_session_header(
+    headers: &mut Vec<(String, String)>,
+    base_url: &str,
+    conversation_id: Option<&str>,
+) {
+    let Some(cid) = conversation_id.filter(|c| !c.is_empty()) else {
+        return;
+    };
+    if is_opencode_host(base_url)
+        && !headers
+            .iter()
+            .any(|(k, _)| k.eq_ignore_ascii_case("x-opencode-session"))
+    {
+        headers.push(("x-opencode-session".to_owned(), cid.to_owned()));
+    }
 }
 
 fn map_genai_error(err: genai::Error) -> OpenAiCompatibleError {
@@ -3298,6 +3336,8 @@ pub struct TitleGenInput {
     pub model_id: String,
     pub api_type: AgentProviderApiType,
     pub reasoning_effort: crate::settings::ReasoningEffortSetting,
+    pub extra_headers: Vec<(String, String)>,
+    pub conversation_id: String,
 }
 
 pub struct ByopOutputInput {
@@ -4548,6 +4588,8 @@ pub(crate) async fn generate_title_via_byop(
         model_id: tg.model_id.clone(),
         api_type: tg.api_type,
         reasoning_effort: tg.reasoning_effort,
+        extra_headers: tg.extra_headers.clone(),
+        conversation_id: tg.conversation_id.clone(),
     };
     let system = include_str!("prompts/tasks/title_system.md");
     let user_prompt = format!(
@@ -6079,6 +6121,38 @@ mod cache_boundary_stability_tests {
             "空 conversation_id 应跳过 prompt_cache_key"
         );
         assert!(opts.cache_control.is_none(), "cache_control 永远不发");
+    }
+
+    fn opencode_session_headers(
+        base_url: &str,
+        cid: &str,
+        user: Vec<(String, String)>,
+    ) -> Vec<(String, String)> {
+        use crate::settings::ReasoningEffortSetting as R;
+        let opts = build_chat_options(
+            AgentProviderApiType::OpenAi,
+            base_url,
+            "glm-5",
+            R::Auto,
+            user,
+            Some(cid),
+        );
+        opts.extra_headers
+            .map(|h| h.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn opencode_session_header_added_only_for_opencode_host() {
+        let got = opencode_session_headers("https://opencode.ai/zen/go/v1", "c1", vec![]);
+        assert_eq!(got, vec![("x-opencode-session".to_owned(), "c1".to_owned())]);
+        assert!(opencode_session_headers("https://example.com/v1", "c1", vec![]).is_empty());
+        assert!(opencode_session_headers("https://notopencode.ai/v1", "c1", vec![]).is_empty());
+        assert!(opencode_session_headers("https://opencode.ai/zen/go/v1", "", vec![]).is_empty());
+        let user = vec![("X-OpenCode-Session".to_owned(), "mine".to_owned())];
+        let got = opencode_session_headers("https://opencode.ai/zen/go/v1", "c1", user);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].1, "mine");
     }
 
     /// **Anthropic 路径 build_chat_options 不下发 cache_control**
