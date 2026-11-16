@@ -21,8 +21,8 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # Appended to $DCS_START to signal that the following message is JSON-encoded.
   DCS_JSON_MARKER="d"
 
-  # Byte used to signal the end of a DCS.
-  DCS_END="$(printf '\x9c')"
+  # Byte sequence used to signal the end of a DCS (7-bit ST: ESC \).
+  DCS_END="$(printf '\x1b\x5c')"
 
   # OSC used to mark the start of in-band command output.
   #
@@ -671,6 +671,21 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
       fi
   }
 
+  # Strips prompt constructs that zsh counts as visible "glitch" columns even
+  # when they appear inside a %{...%} zero-width region, returning the result
+  # in $REPLY. The explicit-width form %n{ is rewritten to %{ (preserving the
+  # brace pairing), and the %G, %nG, and %-nG forms are removed entirely.
+  # Neither change affects the rendered prompt bytes, only zsh's internal
+  # width accounting. Literal %% escapes are matched first so that they cannot
+  # form false positives (e.g. %%1{ renders as literal text and must be left
+  # alone).
+  function warp_strip_glitch_width_constructs() {
+    setopt localoptions extendedglob
+    local match mbegin mend
+    REPLY=${1:-}
+    REPLY=${REPLY//(#b)(%%|%<->\{|%(-|)(<->|)G)/${${match[1]:#%(-|)(<->|)G}/(#s)%<->\{(#e)/%\{}}
+  }
+
   # Check whether the prompt-related variables have OSC prompt marker sequences,
   # and if not, wrap them with the appropriate markers so that we can direct the
   # prompt bytes to the appropriate grids.
@@ -752,7 +767,21 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
         PROMPT=$preceding_suffix$following_suffix
       fi
 
-      ORIGINAL_PROMPT=$PROMPT
+      # If the prompt we extracted is exactly the glitch-stripped value that we
+      # installed on a previous refresh, keep the existing ORIGINAL_PROMPT: it
+      # holds the pristine value, whose width annotations are still needed if
+      # we later switch to honoring the PS1.
+      if [[ "$PROMPT" != "${WARP_STRIPPED_ORIGINAL_PROMPT:-}" ]]; then
+        if [[ -n "${WARP_STRIPPED_ORIGINAL_PROMPT:-}" && "$PROMPT" == *"$WARP_STRIPPED_ORIGINAL_PROMPT"* ]]; then
+          # Another hook added content around the stripped prompt that we
+          # installed (e.g. a virtualenv prefix). Rehydrate the stripped
+          # portion back to its pristine value before saving, so that the
+          # width annotations survive alongside the added content.
+          ORIGINAL_PROMPT=${PROMPT//$WARP_STRIPPED_ORIGINAL_PROMPT/$ORIGINAL_PROMPT}
+        else
+          ORIGINAL_PROMPT=$PROMPT
+        fi
+      fi
       PROMPT="$prompt_prefix$PROMPT$suffix"
     fi
 
@@ -772,14 +801,26 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
     # If we are using the Warp prompt, we pass a "hidden left prompt" to the prompt
     # preview grid (the hidden prompt grid) with cursor markers surrounding the entire prompt.
     if [[ "$WARP_HONOR_PS1" != "1" ]]; then
-      if [[ "$PROMPT" != "%{$prompt_prefix$ORIGINAL_PROMPT$suffix%}" ]]; then
+      # Even though the entire prompt is surrounded by cursor markers below,
+      # zsh still counts explicit-width constructs (%n{...%} and %G) within it
+      # as visible "glitch" columns. Since the prompt is routed to the hidden
+      # prompt grid and occupies zero columns of the combined prompt/command
+      # grid, any nonzero counted width desyncs zle's internal cursor position
+      # from the physical one, which corrupts partial redraws of the command
+      # (e.g. when zsh-syntax-highlighting recolors individual tokens). Strip
+      # those constructs before wrapping; this only changes zsh's width
+      # accounting, never the rendered prompt bytes.
+      local REPLY
+      warp_strip_glitch_width_constructs "$ORIGINAL_PROMPT"
+      WARP_STRIPPED_ORIGINAL_PROMPT=$REPLY
+      if [[ "$PROMPT" != "%{$prompt_prefix$WARP_STRIPPED_ORIGINAL_PROMPT$suffix%}" ]]; then
         # We purposefully surround this entire prompt with cursor markers to prevent
         # the shell from moving its internal state of the cursor position, for purposes
         # of printing the command with the Warp prompt.
         # Note that the Warp prompt is always ABOVE the combined grid in finished blocks
         # (same line prompt only affects the input editor with Warp prompt, not
         # finished blocks).
-        PROMPT="%{$prompt_prefix$ORIGINAL_PROMPT$suffix%}"
+        PROMPT="%{$prompt_prefix$WARP_STRIPPED_ORIGINAL_PROMPT$suffix%}"
       fi
     # Otherwise, if we are using the PS1, we use the normal prompt markers.
     else
@@ -790,7 +831,9 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
       fi
     fi
 
-    if [[ "${RPROMPT:-}" != "%{"*"%}" ]]; then
+    # Do not synthesize an empty right prompt. Even without visible content, zsh reserves
+    # right-prompt layout space and may corrupt wrapped command redraws in the command grid.
+    if [[ -n "${RPROMPT:-}" && "${RPROMPT:-}" != "%{"*"%}" ]]; then
       RPROMPT="%{${RPROMPT:-}%}"
     fi
 
@@ -1216,9 +1259,22 @@ esac
     # do we have a description parameter?
     # note we don''t use zparseopts here because of combined option parameters
     # with arguments like -default- confuse it.
-    if (( $@[(I)-d] )); then # kind of a hack, $+@[(r)-d] doesn''t work because of line noise overload
-        # next param after -d
-        __tmp=${@[$[${@[(i)-d]}+1]]}
+    #
+    # -d can be passed on its own (e.g. from _arguments) or clustered with other short
+    # flags (e.g. -ld from _describe). Match any flag token consisting of a leading -,
+    # zero or more letters, and a trailing d, rather than requiring an exact "-d". Use
+    # (I), not (i): (i) returns one past the end (not 0) when nothing matches, which
+    # would make the presence test below true on every call. Restrict the search to the
+    # same leading flags-only prefix the -O/-A/-D check above uses (everything before the
+    # first bare "-"/"--"), so a completion candidate that happens to look like a flag
+    # (a literal "-d"/"-ld" match, e.g. for ls or find) is never mistaken for the flag.
+    setopt localoptions extendedglob
+    local -a __flags
+    __flags=(${@[1,(i)(-|--)]})
+    local __d_idx=${__flags[(I)-[a-zA-Z]#d]}
+    if (( __d_idx )); then
+        # next param after the flag containing -d
+        __tmp=${@[$[__d_idx+1]]}
         # description can be given as an array parameter name, or inline () array
         if [[ $__tmp == \(* ]]; then
             eval "__dscr=$__tmp"
