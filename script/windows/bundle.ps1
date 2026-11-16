@@ -369,6 +369,15 @@ if ($SIGN_TOOL_CMD) {
     $ISCC_ARGS += '/DSIGN_TOOL=1'
     $ISCC_ARGS += "/Scodesign=$SIGN_TOOL_CMD"
 }
+if (("$CHANNEL" -eq 'oss') -and -not $IS_TUI -and -not $IS_CLI) {
+    # The OSS installer ships `bin\warp.exe`, a small launcher that opens Warp in a directory.
+    $LAUNCHER_DIR = "$WINDOWS_INSTALLER_DIR\warp-launcher"
+    rustc --edition 2021 -O -C panic=abort -C strip=symbols "$LAUNCHER_DIR\main.rs" -o "$LAUNCHER_DIR\warp.exe"
+    if (-Not $?) {
+        Write-Error 'Failed to build warp.exe launcher'
+        exit 1
+    }
+}
 & ISCC @ISCC_ARGS
 if (-Not $?) {
     Write-Error "Failed to build $APP_NAME installer"

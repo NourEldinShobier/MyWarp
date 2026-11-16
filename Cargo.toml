@@ -506,6 +506,17 @@ debug-assertions = true
 [profile.rltoda]
 inherits = "release-lto-debug_assertions"
 
+# Local iteration profile: optimized but no LTO, many codegen units and incremental
+# compilation, so rebuilds after small edits take minutes rather than tens of minutes.
+# Build with `cargo build --profile fast --bin warp-oss --features release_bundle,gui`.
+[profile.fast]
+inherits = "release"
+lto = "off"
+codegen-units = 256
+incremental = true
+debug = 0
+split-debuginfo = "off"
+
 # A profile tuned for the `oz` CLI tarball. The CLI is shipped over the network
 # and run headlessly, so we trade some compile time and a small amount of
 # runtime perf for a smaller binary by mirroring the size-leaning settings used
