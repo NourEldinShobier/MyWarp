@@ -14,6 +14,7 @@ use crate::terminal::model::block::SerializedBlock;
 use crate::terminal::model::completions::ShellCompletion;
 use crate::terminal::model::terminal_model::HandlerEvent;
 use crate::terminal::shell::ShellType;
+use crate::terminal::zmodem::ZmodemEvent;
 use crate::terminal::ClipboardType;
 use crate::util::AsciiDebug;
 
@@ -156,6 +157,8 @@ pub enum Event {
         title: Option<String>,
         body: String,
     },
+    /// PTY 事件循环发出的 lrzsz/ZMODEM 传输事件。
+    Zmodem(ZmodemEvent),
 }
 
 #[derive(Debug, Clone)]
@@ -498,6 +501,7 @@ impl Debug for Event {
             Event::PluggableNotification { title, body } => {
                 write!(f, "PluggableNotification(title: {title:?}, body: {body})")
             }
+            Event::Zmodem(event) => write!(f, "Zmodem({event:?})"),
             Event::ExitShell { session_id } => {
                 write!(f, "ExitShell(session: {session_id:?})")
             }
