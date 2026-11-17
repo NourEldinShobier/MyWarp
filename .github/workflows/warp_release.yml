@@ -157,9 +157,6 @@ jobs:
           - arch: aarch64
             dmg_name_suffix: arm64
             runner: macos-26 # Pro standard arm64 (M2 Pro)
-          - arch: x86_64
-            dmg_name_suffix: intel
-            runner: macos-26-intel # Pro standard Intel
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -284,6 +281,7 @@ jobs:
           retention-days: 7
 
   release_linux:
+    if: false  # disabled: Linux not released
     name: Build Release (Linux x86_64)
     runs-on: ubuntu-22.04
     needs: prepare_metadata
@@ -519,7 +517,6 @@ jobs:
       - prepare_metadata
       - release_macos
       - release_windows
-      - release_linux
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
