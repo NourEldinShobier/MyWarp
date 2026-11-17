@@ -712,6 +712,25 @@ pub fn handle_incoming_uri(url: &Url, ctx: &mut AppContext) {
     }
 }
 
+/// Whether the startup URLs should open in the restored window instead of a new one: a window
+/// was restored and the only URL is the launcher's `action/new_window?path=...`.
+pub fn should_reuse_restored_window(restored: bool, urls: &[Url]) -> bool {
+    let [url] = urls else {
+        return false;
+    };
+    restored
+        && url.host_str() == Some("action")
+        && url.path() == "/new_window"
+        && url.query_pairs().any(|(k, _)| k == "path")
+}
+
+/// Handles a `new_window` URL as `new_tab`, so it opens in the primary window.
+pub fn handle_incoming_uri_as_new_tab(url: &Url, ctx: &mut AppContext) {
+    let mut url = url.clone();
+    url.set_path("/new_tab");
+    handle_incoming_uri(&url, ctx);
+}
+
 /// Gets the primary window ID, and returns `None` if it does not exist.
 /// A primary window is the foregrounded window, or one of the inactive non-quake windows.
 /// A closed quake window is not counted.
@@ -1106,4 +1125,25 @@ fn safe_url_log_fields(url: &Url) -> String {
         url.host_str().unwrap_or("-"),
         url.path(),
     )
+}
+
+#[cfg(test)]
+mod startup_reuse_tests {
+    use super::*;
+
+    fn urls(s: &[&str]) -> Vec<Url> {
+        s.iter().map(|s| Url::parse(s).unwrap()).collect()
+    }
+
+    #[test]
+    fn reuses_only_for_lone_new_window_path_with_restored_window() {
+        let nw = "warp://action/new_window?path=C:%5Cwork";
+        assert!(should_reuse_restored_window(true, &urls(&[nw])));
+        assert!(!should_reuse_restored_window(false, &urls(&[nw])));
+        assert!(!should_reuse_restored_window(true, &urls(&[nw, nw])));
+        assert!(!should_reuse_restored_window(true, &urls(&[])));
+        assert!(!should_reuse_restored_window(true, &urls(&["warp://action/new_window"])));
+        assert!(!should_reuse_restored_window(true, &urls(&["warp://action/new_tab?path=x"])));
+        assert!(!should_reuse_restored_window(true, &urls(&["file:///C:/work"])));
+    }
 }

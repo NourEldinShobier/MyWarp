@@ -2197,10 +2197,23 @@ fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode
             ctx.dispatch_global_action("root_view:open_from_restored", &arg);
 
             // Process any URLs that were provided on the command line (which may be
-            // file:// URLs or ones using our custom URL scheme).
-            for url in launch_mode.args().urls.iter() {
-                uri::handle_incoming_uri(url, ctx);
+            // file:// URLs or ones using our custom URL scheme). A lone
+            // `new_window?path=` URL reuses the restored window as a new tab.
+            let urls = &launch_mode.args().urls;
+            let reuse_restored_window =
+                uri::should_reuse_restored_window(ctx.window_ids().count() > 0, urls);
+            let startup_urls_start = std::time::Instant::now();
+            for url in urls.iter() {
+                if reuse_restored_window {
+                    uri::handle_incoming_uri_as_new_tab(url, ctx);
+                } else {
+                    uri::handle_incoming_uri(url, ctx);
+                }
             }
+            log::info!(
+                "startup perf: startup URLs (reuse_restored_window={reuse_restored_window}) took {} ms",
+                startup_urls_start.elapsed().as_millis()
+            );
 
             // If, after session restoration and command-line argument handling, we
             // haven't opened any windows, open a new window.
