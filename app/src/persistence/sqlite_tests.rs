@@ -162,6 +162,51 @@ fn test_terminal_window_snapshot(vertical_tabs_panel_open: bool) -> WindowSnapsh
 }
 
 #[test]
+fn test_prune_blocks_caps_per_pane_and_drops_orphans() {
+    use diesel::{sql_query, RunQueryDsl};
+
+    let tempdir = tempfile::tempdir().expect("tempdir should be created");
+    let mut conn = setup_database(&tempdir.path().join("warp.sqlite")).expect("db init");
+    let app_state = AppState {
+        windows: vec![test_terminal_window_snapshot(false)],
+        active_window_index: Some(0),
+        block_lists: Default::default(),
+        running_mcp_servers: Default::default(),
+    };
+    save_app_state(&mut conn, &app_state).expect("app state should save");
+
+    // Pane uuid [1] is persisted; [9] is an orphan.
+    for (pane, count) in [(1, 130), (9, 5)] {
+        for i in 0..count {
+            sql_query(format!(
+                "INSERT INTO blocks (pane_leaf_uuid, stylized_command, stylized_output, exit_code,                  did_execute, honor_ps1, is_background, block_id)                  VALUES (X'0{pane}', X'00', X'00', 0, 1, 0, {}, 'b{pane}-{i}')",
+                i % 2
+            ))
+            .execute(&mut conn)
+            .expect("insert block");
+        }
+    }
+
+    super::super::block_list::prune_blocks(&mut conn).expect("prune");
+
+    #[derive(diesel::QueryableByName)]
+    struct Count {
+        #[diesel(sql_type = diesel::sql_types::BigInt)]
+        n: i64,
+    }
+    let count = |conn: &mut diesel::SqliteConnection, pane: u8| {
+        sql_query(format!(
+            "SELECT COUNT(*) AS n FROM blocks WHERE pane_leaf_uuid = X'0{pane}'"
+        ))
+        .get_result::<Count>(conn)
+        .expect("count")
+        .n
+    };
+    assert_eq!(count(&mut conn, 1), 100);
+    assert_eq!(count(&mut conn, 9), 0);
+}
+
+#[test]
 fn test_sqlite_round_trips_vertical_tabs_panel_open() {
     let tempdir = tempfile::tempdir().expect("tempdir should be created");
     let database_path = tempdir.path().join("warp.sqlite");
