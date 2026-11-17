@@ -266,12 +266,26 @@ impl AutoupdateState {
     /// This method recursively calls itself after a delay. Call it once and only once to start the
     /// loop.
     fn poll_for_update(&mut self, ctx: &mut ModelContext<Self>) {
-        self.enqueue_request(RequestType::Poll, ctx);
+        self.poll_for_update_after(Self::AUTOUPDATE_FIRST_POLL_DELAY, ctx);
+    }
+
+    // Keep the first network check off the startup path.
+    const AUTOUPDATE_FIRST_POLL_DELAY: Duration = Duration::from_secs(30);
+
+    fn poll_for_update_after(&mut self, delay: Duration, ctx: &mut ModelContext<Self>) {
         ctx.spawn(
-            async {
-                Timer::after(Self::AUTOUPDATE_POLL).await;
+            async move {
+                Timer::after(delay).await;
             },
-            |me, _, ctx| me.poll_for_update(ctx),
+            |me, _, ctx| {
+                let start = std::time::Instant::now();
+                me.enqueue_request(RequestType::Poll, ctx);
+                log::info!(
+                    "startup perf: first update poll enqueue took {} ms",
+                    start.elapsed().as_millis()
+                );
+                me.poll_for_update_after(Self::AUTOUPDATE_POLL, ctx);
+            },
         );
     }
 

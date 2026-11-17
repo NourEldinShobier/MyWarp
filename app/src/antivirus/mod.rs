@@ -14,7 +14,28 @@ pub struct AntivirusInfo(Option<String>);
 impl AntivirusInfo {
     pub fn new(_ctx: &mut ModelContext<Self>) -> Self {
         #[cfg(windows)]
-        _ctx.spawn(async move { Self::scan().await }, Self::on_scan_complete);
+        {
+            // COM calls block, and `ctx.spawn` futures are polled on the UI thread, so scan on
+            // a dedicated thread and await the result over a channel.
+            let (tx, rx) = async_channel::bounded(1);
+            std::thread::spawn(move || {
+                let start = std::time::Instant::now();
+                let result = futures_lite::future::block_on(Self::scan());
+                log::info!(
+                    "startup perf: antivirus scan took {} ms",
+                    start.elapsed().as_millis()
+                );
+                let _ = tx.send_blocking(result);
+            });
+            _ctx.spawn(
+                async move {
+                    rx.recv()
+                        .await
+                        .unwrap_or_else(|err| Err(anyhow::anyhow!(err)))
+                },
+                Self::on_scan_complete,
+            );
+        }
 
         Self(None)
     }

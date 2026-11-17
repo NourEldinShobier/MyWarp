@@ -515,7 +515,7 @@ impl SkillManager {
             return HashMap::new();
         };
         let skills_dir = resources_dir.join("bundled").join("skills");
-        read_bundled_skills(&skills_dir)
+        read_bundled_skills_off_thread(skills_dir)
             .await
             .into_iter()
             .map(|(id, skill)| {
@@ -540,7 +540,7 @@ impl SkillManager {
             .join("bundled")
             .join("mcp_skills")
             .join("figma");
-        read_bundled_skills(&figma_skills_dir)
+        read_bundled_skills_off_thread(figma_skills_dir)
             .await
             .into_iter()
             .map(|(id, skill)| {
@@ -562,6 +562,28 @@ impl SkillManager {
         self.skills_by_path.insert(path.clone(), skill);
         self.skills_by_name.entry(name).or_default().insert(path);
     }
+}
+
+/// Runs [`read_bundled_skills`] (file parsing and template rendering) on its own thread so it
+/// does not block the UI thread; `ctx.spawn` futures are polled on the main thread.
+async fn read_bundled_skills_off_thread(skills_dir: PathBuf) -> HashMap<String, ParsedSkill> {
+    let start = std::time::Instant::now();
+    #[cfg(not(target_family = "wasm"))]
+    let skills = {
+        let (tx, rx) = async_channel::bounded(1);
+        std::thread::spawn(move || {
+            let skills = futures_lite::future::block_on(read_bundled_skills(&skills_dir));
+            let _ = tx.send_blocking(skills);
+        });
+        rx.recv().await.unwrap_or_default()
+    };
+    #[cfg(target_family = "wasm")]
+    let skills = read_bundled_skills(&skills_dir).await;
+    log::info!(
+        "startup perf: bundled skills load took {} ms",
+        start.elapsed().as_millis()
+    );
+    skills
 }
 
 /// Read bundled skill definitions from the specified directory.
