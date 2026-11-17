@@ -59,7 +59,7 @@ use crate::terminal::alt_screen_reporting::{
 };
 use crate::terminal::general_settings::{
     AutoOpenCodeReviewPaneOnFirstAgentChange, GeneralSettings, LinkTooltip, PersistConversations,
-    QuitOnLastWindowClosed, RestoreSession, ShowWarningBeforeQuitting,
+    LoginItem, QuitOnLastWindowClosed, RestoreSession, ShowWarningBeforeQuitting,
 };
 use crate::terminal::keys_settings::{
     ActivationHotkeyEnabled, CtrlTabBehaviorSetting, KeysSettings, KeysSettingsChangedEvent,
@@ -651,6 +651,7 @@ pub enum FeaturesPageAction {
     ToggleCopyOnSelect,
     ToggleNotifications,
     ToggleRestoreSession,
+    ToggleLoginItem,
     TogglePersistConversations,
     ToggleAutocompleteSymbols,
     ToggleLinuxClipboardSelection,
@@ -839,6 +840,10 @@ impl FeaturesPageAction {
             Self::ToggleRestoreSession => {
                 TelemetryEvent::ToggleRestoreSession(*GeneralSettings::as_ref(ctx).restore_session)
             }
+            Self::ToggleLoginItem => TelemetryEvent::FeaturesPageAction {
+                action: "ToggleLoginItem".to_string(),
+                value: to_string(*GeneralSettings::as_ref(ctx).add_app_as_login_item.value()),
+            },
             Self::TogglePersistConversations => TelemetryEvent::FeaturesPageAction {
                 action: "TogglePersistConversations".to_string(),
                 value: to_string(*GeneralSettings::as_ref(ctx).persist_conversations),
@@ -1398,6 +1403,9 @@ impl TypedActionView for FeaturesPageView {
                     report_if_error!(general_settings.restore_session.toggle_and_save_value(ctx))
                 })
             }
+            ToggleLoginItem => GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
+                report_if_error!(settings.add_app_as_login_item.toggle_and_save_value(ctx));
+            }),
             TogglePersistConversations => {
                 GeneralSettings::handle(ctx).update(ctx, |general_settings, ctx| {
                     report_if_error!(general_settings
@@ -2539,6 +2547,13 @@ impl FeaturesPageView {
             .is_supported_on_current_platform()
         {
             general_widgets.push(Box::new(ConversationPersistenceWidget::default()))
+        }
+
+        if general_settings
+            .add_app_as_login_item
+            .is_supported_on_current_platform()
+        {
+            general_widgets.push(Box::new(LoginItemWidget::default()));
         }
 
         general_widgets.push(Box::new(SnackbarHeaderWidget::default()));
@@ -4344,6 +4359,53 @@ impl SettingsWidget for NativeRedirectWidget {
                 .build()
                 .on_click(move |ctx, _, _| {
                     ctx.dispatch_typed_action(FeaturesPageAction::ToggleOpenLinksInDesktopApp);
+                })
+                .finish(),
+            None,
+        )
+    }
+}
+
+#[derive(Default)]
+struct LoginItemWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for LoginItemWidget {
+    type View = FeaturesPageView;
+
+    fn search_terms(&self) -> &str {
+        "login item startup start windows app restart automatic"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let general_settings = GeneralSettings::as_ref(app);
+        render_body_item::<FeaturesPageAction>(
+            crate::t!("settings-features-start-at-login"),
+            None,
+            LocalOnlyIconState::for_setting(
+                LoginItem::storage_key(),
+                LoginItem::sync_to_cloud(),
+                &mut view
+                    .button_mouse_states
+                    .local_only_icon_tooltip_states
+                    .borrow_mut(),
+                app,
+            ),
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(*general_settings.add_app_as_login_item)
+                .build()
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(FeaturesPageAction::ToggleLoginItem);
                 })
                 .finish(),
             None,

@@ -1069,6 +1069,7 @@ settings-features-category-system = Система
 settings-features-open-links-in-desktop = Открывать ссылки в настольном приложении
 settings-features-open-links-in-desktop-tooltip = Автоматически открывать ссылки в настольном приложении, когда это возможно.
 settings-features-restore-session = Восстанавливать окна, вкладки и панели при запуске
+settings-features-start-at-login = Запускать Warp при входе в систему
 settings-features-persist-conversations = Сохранять диалоги агента в локальную историю
 settings-features-show-sticky-command-header = Показывать закрепленный заголовок команды
 settings-features-show-link-tooltip = Показывать всплывающую подсказку при клике на ссылки

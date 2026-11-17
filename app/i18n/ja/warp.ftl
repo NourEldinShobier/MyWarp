@@ -1005,6 +1005,7 @@ settings-features-category-system = システム
 settings-features-open-links-in-desktop = リンクをデスクトップアプリで開く
 settings-features-open-links-in-desktop-tooltip = 可能な限りリンクを自動的にデスクトップアプリで開きます。
 settings-features-restore-session = 起動時にウィンドウ・タブ・ペインを復元
+settings-features-start-at-login = ログイン時に Warp を起動
 settings-features-persist-conversations = エージェント会話をローカル履歴に保存
 settings-features-show-sticky-command-header = 固定コマンドヘッダを表示
 settings-features-show-link-tooltip = リンククリック時にツールチップを表示

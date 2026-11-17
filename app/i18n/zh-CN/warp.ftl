@@ -1050,6 +1050,7 @@ settings-features-category-system = 系统
 settings-features-open-links-in-desktop = 在桌面应用中打开链接
 settings-features-open-links-in-desktop-tooltip = 尽可能自动在桌面应用中打开链接。
 settings-features-restore-session = 启动时恢复窗口、标签页和面板
+settings-features-start-at-login = 登录时启动 Warp
 settings-features-persist-conversations = 保存智能体对话到本地历史
 settings-features-show-sticky-command-header = 显示固定的命令标题栏
 settings-features-show-link-tooltip = 点击链接时显示提示
