@@ -1,46 +1,74 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use input_classifier::{HeuristicClassifier, InputClassifier};
 use warpui::{Entity, ModelContext, SingletonEntity};
 
 pub struct InputClassifierModel {
-    pub classifier: Arc<dyn InputClassifier>,
+    /// Starts as the heuristic classifier and is swapped for the ML classifier once it loads.
+    classifier: Arc<RwLock<Arc<dyn InputClassifier>>>,
 }
 
 impl InputClassifierModel {
     pub fn new(_ctx: &mut ModelContext<Self>) -> Self {
-        #[cfg(feature = "nld_onnx_model")]
-        match input_classifier::OnnxClassifier::new(input_classifier::OnnxModel::BertTiny) {
-            Ok(classifier) => {
-                log::info!("Loaded onnx classifier");
-                return Self {
-                    classifier: Arc::new(classifier),
-                };
-            }
-            Err(e) => log::warn!("Failed to load onnx classifier: {e:#}"),
-        }
+        let classifier: Arc<RwLock<Arc<dyn InputClassifier>>> =
+            Arc::new(RwLock::new(Arc::new(HeuristicClassifier)));
 
-        #[cfg(feature = "nld_fasttext_model")]
-        if is_nld_classifier_enabled(_ctx) {
-            match input_classifier::FasttextClassifier::new() {
-                Ok(classifier) => {
-                    log::info!("Loaded fasttext classifier");
-                    return Self {
-                        classifier: Arc::new(classifier),
-                    };
+        // Building the model is slow, so do it off the main thread.
+        #[cfg(not(target_family = "wasm"))]
+        {
+            #[cfg(feature = "nld_fasttext_model")]
+            let fasttext_enabled = is_nld_classifier_enabled(_ctx);
+            #[cfg(not(feature = "nld_fasttext_model"))]
+            let fasttext_enabled = false;
+            let slot = classifier.clone();
+            std::thread::spawn(move || {
+                let start = std::time::Instant::now();
+                if let Some(loaded) = load_model_classifier(fasttext_enabled) {
+                    if let Ok(mut slot) = slot.write() {
+                        *slot = loaded;
+                    }
                 }
-                Err(e) => log::warn!("Failed to load fasttext classifier: {e:#}"),
-            }
+                log::info!(
+                    "startup perf: input classifier model load took {} ms",
+                    start.elapsed().as_millis()
+                );
+            });
         }
 
-        Self {
-            classifier: Arc::new(HeuristicClassifier),
-        }
+        Self { classifier }
     }
 
     pub fn classifier(&self) -> Arc<dyn InputClassifier> {
-        self.classifier.clone()
+        match self.classifier.read() {
+            Ok(classifier) => classifier.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
     }
+}
+
+#[allow(unused_variables)]
+fn load_model_classifier(fasttext_enabled: bool) -> Option<Arc<dyn InputClassifier>> {
+    #[cfg(feature = "nld_onnx_model")]
+    match input_classifier::OnnxClassifier::new(input_classifier::OnnxModel::BertTiny) {
+        Ok(classifier) => {
+            log::info!("Loaded onnx classifier");
+            return Some(Arc::new(classifier));
+        }
+        Err(e) => log::warn!("Failed to load onnx classifier: {e:#}"),
+    }
+
+    #[cfg(feature = "nld_fasttext_model")]
+    if fasttext_enabled {
+        match input_classifier::FasttextClassifier::new() {
+            Ok(classifier) => {
+                log::info!("Loaded fasttext classifier");
+                return Some(Arc::new(classifier));
+            }
+            Err(e) => log::warn!("Failed to load fasttext classifier: {e:#}"),
+        }
+    }
+
+    None
 }
 
 impl Entity for InputClassifierModel {
