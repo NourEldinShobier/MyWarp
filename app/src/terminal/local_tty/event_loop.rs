@@ -236,6 +236,9 @@ where
                 None => terminal.insert(match self.terminal.try_lock() {
                     // If we've filled up the buffer, block on locking the terminal.
                     None if bytes_in_buffer >= READ_BUFFER_SIZE => self.terminal.lock(),
+                    // The PTY is drained (WouldBlock), so retrying the read would only
+                    // spin; wait for the lock instead.
+                    None if !*can_read => self.terminal.lock(),
                     // Otherwise, if we failed to acquire the lock, try to read more
                     // data into the buffer.
                     None => continue,

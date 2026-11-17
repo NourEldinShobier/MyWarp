@@ -2654,6 +2654,10 @@ impl ansi::Handler for TerminalModel {
         // Filter out null bytes from the title string.
         let filtered_title = title.map(|t| t.replace('\0', ""));
 
+        // TUIs (e.g. Claude Code's spinner) rewrite the title constantly; skip no-op updates.
+        if self.title == filtered_title {
+            return;
+        }
         self.title.clone_from(&filtered_title);
 
         // Only send this event if there was no custom title set.
