@@ -14904,7 +14904,9 @@ dependencies = [
  "warp_managed_secrets",
  "warp_multi_agent_api",
  "warp_ripgrep",
+ "warp_sftp",
  "warp_ssh_manager",
+ "warp_sync",
  "warp_terminal",
  "warp_util",
  "warp_web_event_bus",
@@ -14921,8 +14923,6 @@ dependencies = [
  "winit",
  "winreg",
  "x11rb",
- "warp_sftp",
- "warp_sync",
  "zbus 5.16.0",
  "zeroize",
 ]
@@ -15272,6 +15272,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "warp_sftp"
+version = "0.1.0"
+dependencies = [
+ "openssl-sys",
+ "smol",
+ "ssh2",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "warp_ssh_manager"
 version = "0.1.0"
 dependencies = [
@@ -15297,6 +15308,24 @@ dependencies = [
  "uuid",
  "warp_sync",
  "zeroize",
+]
+
+[[package]]
+name = "warp_sync"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "log",
+ "reqwest 0.12.28",
+ "rustls 0.23.40",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
@@ -17114,35 +17143,6 @@ dependencies = [
  "quote",
  "syn 2.0.117",
  "synstructure",
-]
-
-[[package]]
-name = "warp_sftp"
-version = "0.1.0"
-dependencies = [
- "openssl-sys",
- "smol",
- "ssh2",
- "tempfile",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "warp_sync"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "base64 0.22.1",
- "chrono",
- "log",
- "reqwest 0.12.28",
- "rustls 0.23.40",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.18",
- "tokio",
 ]
 
 [[package]]
