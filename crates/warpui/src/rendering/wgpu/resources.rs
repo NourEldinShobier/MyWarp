@@ -244,8 +244,75 @@ fn device_info_from_adapter_info(adapter_info: wgpu::AdapterInfo) -> GPUDeviceIn
 /// This is inspired by the implementation of `request_adapter` in `wgpu_core`:
 /// https://github.com/gfx-rs/wgpu/blob/badb3c88ea29acb159d333e2f60b1cc305bbd512/wgpu-core/src/instance.rs#L857
 #[allow(clippy::too_many_arguments)]
-#[cfg_attr(target_family = "wasm", allow(unused_variables))]
 async fn select_adapter(
+    instance: &wgpu::Instance,
+    surface: &wgpu::Surface<'static>,
+    backends: wgpu::Backends,
+    backend_preference: Option<wgpu::Backend>,
+    gpu_power_preference: GPUPowerPreference,
+    initial_surface_size: Vector2F,
+    windowing_system: Option<windowing::System>,
+    downrank_non_nvidia_vulkan_adapters: bool,
+) -> Option<(
+    Adapter,
+    Device,
+    Queue,
+    SurfaceConfiguration,
+    HashSet<wgpu::Backend>,
+)> {
+    let start = std::time::Instant::now();
+
+    // On Windows, enumerating Vulkan and GL adapters is slow, so try DX12 alone first and only
+    // fall back to every enabled backend if no DX12 adapter initializes. An explicit backend
+    // preference for something other than DX12, or a WGPU_BACKEND override, skips this.
+    #[cfg(windows)]
+    if matches!(backend_preference, None | Some(wgpu::Backend::Dx12))
+        && wgpu::Backends::from_env().is_none()
+        && backends.contains(wgpu::Backends::DX12)
+        && backends != wgpu::Backends::DX12
+    {
+        let result = select_adapter_in_backends(
+            instance,
+            surface,
+            wgpu::Backends::DX12,
+            backend_preference,
+            gpu_power_preference,
+            initial_surface_size,
+            windowing_system,
+            downrank_non_nvidia_vulkan_adapters,
+        )
+        .await;
+        if result.is_some() {
+            log::info!(
+                "startup perf: wgpu adapter selection (DX12 only) took {} ms",
+                start.elapsed().as_millis()
+            );
+            return result;
+        }
+        log::warn!("No usable DX12 adapter found, falling back to all wgpu backends");
+    }
+
+    let result = select_adapter_in_backends(
+        instance,
+        surface,
+        backends,
+        backend_preference,
+        gpu_power_preference,
+        initial_surface_size,
+        windowing_system,
+        downrank_non_nvidia_vulkan_adapters,
+    )
+    .await;
+    log::info!(
+        "startup perf: wgpu adapter selection took {} ms",
+        start.elapsed().as_millis()
+    );
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+#[cfg_attr(target_family = "wasm", allow(unused_variables))]
+async fn select_adapter_in_backends(
     instance: &wgpu::Instance,
     surface: &wgpu::Surface<'static>,
     backends: wgpu::Backends,
@@ -285,7 +352,7 @@ async fn select_adapter(
 
     log::info!("Enabled wgpu backends: {backends:?}");
 
-    log::info!("Available wgpu adapters (in priority order):");
+    log::debug!("Available wgpu adapters (in priority order):");
 
     let sorted_adapters = sort_adapters(
         adapters.collect(),
@@ -295,24 +362,15 @@ async fn select_adapter(
         downrank_non_nvidia_vulkan_adapters,
     );
 
-    let adapters = sorted_adapters
-        // Filter out any unsupported adapters and log information about each one.
-        .filter(|adapter| is_supported_adapter(adapter, surface))
-        // While we don't strictly need to collect the iterator into a vector,
-        // this ensures we log adapter information for all adapters.  (Omitting
-        // this means the iterator is lazily evaluated, and we'll only print
-        // adapter information up until the point where we find a working one.)
-        .collect_vec();
-
-    let supported_backends = adapters
-        .iter()
-        .map(|adapter| adapter.get_info().backend)
-        .collect::<HashSet<_>>();
-
-    for adapter in adapters {
+    // Stop at the first supported adapter whose device initializes.
+    for adapter in sorted_adapters {
+        if !is_supported_adapter(&adapter, surface) {
+            continue;
+        }
         if let Some((device, queue, surface_config)) =
             initialize_device(&adapter, surface, initial_surface_size).await
         {
+            let supported_backends = HashSet::from([adapter.get_info().backend]);
             return Some((adapter, device, queue, surface_config, supported_backends));
         }
     }
@@ -374,7 +432,7 @@ fn is_supported_adapter(adapter: &wgpu::Adapter, surface: &wgpu::Surface) -> boo
     } else {
         format!(" ({})", info.driver_info)
     };
-    log::info!("{device_type:?}: {device_name}\n\tBackend: {backend:?}\n\tDriver: {driver}{driver_info}\n\tCan present: {can_present}\n\tSupported texture format: {supported_texture_format:?}\n\tSupported alpha mode: {supported_alpha_modes:?}");
+    log::debug!("{device_type:?}: {device_name}\n\tBackend: {backend:?}\n\tDriver: {driver}{driver_info}\n\tCan present: {can_present}\n\tSupported texture format: {supported_texture_format:?}\n\tSupported alpha mode: {supported_alpha_modes:?}");
 
     can_present && supported_texture_format.is_some()
 }
