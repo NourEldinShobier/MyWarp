@@ -1127,9 +1127,11 @@ impl PaneBranch {
                 SplitDirection::Vertical => (pane_size_1.y(), pane_size_2.y()),
             };
 
-            // Omit noise in dragging.
+            // Omit noise in dragging. Also bail on a zero total (e.g. window minimized), which
+            // would divide by zero below.
             let minimum_pane_size = get_minimum_pane_size(ctx);
-            if size_1 + delta < minimum_pane_size
+            if size_1 + size_2 <= 0.
+                || size_1 + delta < minimum_pane_size
                 || size_2 - delta < minimum_pane_size
                 || delta.abs() < f32::EPSILON
             {

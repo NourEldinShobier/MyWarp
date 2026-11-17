@@ -202,7 +202,10 @@ pub(super) fn spawn(
             &mut process_information,
         )
         .map_err(|error| {
-            let detail = shell_starter.shell_detail();
+            let mut detail = shell_starter.shell_detail();
+            if let Some(hint) = access_denied_hint(&error) {
+                detail.push_str(hint);
+            }
             PtySpawnError::CreateShellProcessFailed { detail, error }
         })?;
     }
@@ -223,6 +226,18 @@ pub(super) fn spawn(
     };
     Ok(PtySpawnInfo { result, child })
 }
+/// HRESULT for E_ACCESSDENIED (0x80070005).
+const E_ACCESSDENIED_HRESULT: i32 = 0x8007_0005_u32 as i32;
+
+/// Explains the usual causes of "Access is denied" when launching the shell.
+fn access_denied_hint(error: &windows::core::Error) -> Option<&'static str> {
+    (error.code().0 == E_ACCESSDENIED_HRESULT).then_some(
+        " (access denied: check that the shell executable exists and is executable by your \
+         user, and that antivirus/EDR or AppLocker is not blocking it; pick another shell in \
+         Settings > Features > Session > Startup shell)",
+    )
+}
+
 #[derive(Error, Debug)]
 pub enum EncodingError {
     #[error("Could not encode argument {arg:?}")]
@@ -430,6 +445,13 @@ impl EventedPty for Pty {
     }
 
     fn on_resize(&mut self, size: &crate::terminal::SizeInfo) {
+        // A minimized window reports a zero-sized pane; resizing the pseudoconsole to 0 rows or
+        // columns would shrink the shell's view to nothing.
+        let pane_size = size.pane_size_px();
+        if pane_size.x() <= 0. || pane_size.y() <= 0. {
+            log::info!("Skipping pseudoconsole resize to zero size");
+            return;
+        }
         if let Err(err) = unsafe { self.conpty_api.resize(self.pty_handle, size.to_coord()) } {
             log::error!("Failed to resize pseudoconsole: {err:?}");
         }

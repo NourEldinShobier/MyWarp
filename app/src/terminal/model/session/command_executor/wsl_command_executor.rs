@@ -9,6 +9,12 @@ use itertools::Itertools as _;
 use std::any::Any;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::time::Duration;
+use warpui::r#async::FutureExt as _;
+
+/// Upper bound for one `wsl.exe` invocation. A distro with a dead interop channel can accept the
+/// launch and never return, which would otherwise hang the caller forever.
+const WSL_COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// `CommandExecutor` implementation that executes the given `command` in a WSL instance via the
 /// `wsl.exe` executable.
@@ -97,7 +103,15 @@ impl WslCommandExecutor {
             // so there's no need for the process itself to stick around.
             .kill_on_drop(true)
             .output()
+            .with_timeout(WSL_COMMAND_TIMEOUT)
             .await
+            .map_err(|_| {
+                anyhow!(
+                    "wsl.exe did not respond within {}s for distribution {}",
+                    WSL_COMMAND_TIMEOUT.as_secs(),
+                    self.distro_name
+                )
+            })?
             .map(|output| output.into())
             .map_err(|e| {
                 safe_warn!(
