@@ -397,8 +397,13 @@ impl RequestParams {
                 })
         };
 
+        let mut input: Vec<AIAgentInput> = request_input.all_inputs().cloned().collect();
+        if should_redact_secrets {
+            super::redaction::redact_inputs(&mut input);
+        }
+
         Self {
-            input: request_input.all_inputs().cloned().collect(),
+            input,
             conversation_token: conversation.server_conversation_token,
             forked_from_conversation_token: conversation.forked_from_conversation_token,
             ambient_agent_task_id: conversation.ambient_agent_task_id,
