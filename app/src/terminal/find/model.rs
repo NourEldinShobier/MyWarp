@@ -9,7 +9,13 @@ pub use block_list::{BlockGridMatch, BlockListFindRun, BlockListMatch};
 pub use rich_content::{FindableRichContentView, RichContentMatchId};
 
 use crate::terminal::block_list_viewport::InputMode;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 
 use alt_screen::{run_find_on_alt_screen, AltScreenFindRun};
 use parking_lot::FairMutex;
@@ -18,13 +24,19 @@ use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHa
 
 use crate::{
     settings::InputModeSettings,
-    terminal::model::{terminal_model::BlockIndex, TerminalModel},
+    terminal::model::{
+        find::RegexDFAs,
+        terminal_model::{BlockIndex, BlockSortDirection},
+        TerminalModel,
+    },
     view_components::find::{FindEvent, FindModel},
 };
 
 use crate::view_components::find::FindDirection;
 
-use block_list::run_find_on_block_list;
+use block_list::{
+    compile_dfas, run_find_on_block_list, scan_item, scan_items, should_scan_async, ScanBatch,
+};
 use rich_content::FindableRichContentHandle;
 
 /// `TerminalView`-scoped model for the find bar.
@@ -41,6 +53,13 @@ pub struct TerminalFindModel {
 
     /// `true` if the find bar is open.
     is_find_bar_open: bool,
+
+    /// Bumped to cancel the background blocklist scan in flight, if any. Results of a scan with
+    /// an older generation are dropped.
+    scan_generation: Arc<AtomicU64>,
+
+    /// `true` while a background scan is still filling in `block_list_find_run`.
+    scan_in_progress: bool,
 }
 
 impl FindModel for TerminalFindModel {
@@ -87,6 +106,8 @@ impl TerminalFindModel {
             alt_screen_find_run: None,
             block_list_find_run: None,
             is_find_bar_open: false,
+            scan_generation: Arc::new(AtomicU64::new(0)),
+            scan_in_progress: false,
         }
     }
     pub fn register_findable_rich_content_view<T: FindableRichContentView>(
@@ -129,6 +150,7 @@ impl TerminalFindModel {
     /// Runs find with the given `options` on the alt screen or blocklist (depending on which is
     /// active).
     pub fn run_find(&mut self, options: FindOptions, ctx: &mut ModelContext<Self>) {
+        self.cancel_scan();
         if self.terminal_model.lock().is_alt_screen_active() {
             self.alt_screen_find_run = Some(run_find_on_alt_screen(
                 options,
@@ -142,15 +164,105 @@ impl TerminalFindModel {
                 .value()
                 .block_sort_direction();
 
-            self.block_list_find_run = Some(run_find_on_block_list(
-                options,
-                self.terminal_model.lock().block_list(),
-                &self.rich_content_views,
-                block_sort_direction,
-                ctx,
-            ));
+            // Large blocklists are scanned in the background so the UI and PTY reader are not
+            // blocked behind one long find.
+            let dfas = {
+                let terminal_model = self.terminal_model.lock();
+                should_scan_async(&options, terminal_model.block_list())
+                    .then(|| compile_dfas(&options))
+                    .flatten()
+            };
+            if let Some(dfas) = dfas {
+                self.start_scan(options, dfas, block_sort_direction, ctx);
+            } else {
+                self.block_list_find_run = Some(run_find_on_block_list(
+                    options,
+                    self.terminal_model.lock().block_list(),
+                    &self.rich_content_views,
+                    block_sort_direction,
+                    ctx,
+                ));
+            }
         }
         ctx.emit(FindEvent::RanFind);
+    }
+
+    fn cancel_scan(&mut self) {
+        self.scan_generation.fetch_add(1, Ordering::Relaxed);
+        self.scan_in_progress = false;
+    }
+
+    /// Scans the blocklist, newest block first, on a background thread. The scan takes the
+    /// terminal model lock once per block, and its matches are appended to the (initially empty)
+    /// find run as they arrive.
+    fn start_scan(
+        &mut self,
+        options: FindOptions,
+        dfas: Arc<RegexDFAs>,
+        block_sort_direction: BlockSortDirection,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let items = scan_items(self.terminal_model.lock().block_list());
+        self.block_list_find_run = Some(BlockListFindRun::new_scanning(
+            options,
+            dfas.clone(),
+            block_sort_direction,
+        ));
+        self.scan_in_progress = true;
+
+        let generation = self.scan_generation.load(Ordering::Relaxed);
+        let current_generation = self.scan_generation.clone();
+        let terminal_model = self.terminal_model.clone();
+        let (tx, rx) = async_channel::unbounded::<ScanBatch>();
+        ctx.background_executor()
+            .spawn(async move {
+                for item in items {
+                    if current_generation.load(Ordering::Relaxed) != generation {
+                        return;
+                    }
+                    let batch = scan_item(item, &dfas, &terminal_model, block_sort_direction);
+                    if tx.send(batch).await.is_err() {
+                        return;
+                    }
+                    futures_lite::future::yield_now().await;
+                }
+            })
+            .detach();
+
+        ctx.spawn_stream_local(
+            rx,
+            move |me, batch, ctx| me.handle_scan_batch(generation, batch, ctx),
+            move |me, ctx| me.finish_scan(generation, ctx),
+        );
+    }
+
+    fn handle_scan_batch(
+        &mut self,
+        generation: u64,
+        batch: ScanBatch,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if generation != self.scan_generation.load(Ordering::Relaxed) {
+            return;
+        }
+        let Some(run) = self.block_list_find_run.as_mut() else {
+            return;
+        };
+        if let Some(is_first_match) = run.append_batch(batch, &self.rich_content_views, ctx) {
+            if is_first_match {
+                ctx.emit(FindEvent::UpdatedFocusedMatch);
+            }
+            ctx.emit(FindEvent::RanFind);
+        }
+    }
+
+    fn finish_scan(&mut self, generation: u64, ctx: &mut ModelContext<Self>) {
+        if generation != self.scan_generation.load(Ordering::Relaxed) {
+            return;
+        }
+        self.scan_in_progress = false;
+        // Output may have changed while the scan was running, so refresh the newest block.
+        self.rerun_find_on_active_grid(ctx);
     }
 
     /// Reruns find with the same options applied to the current run, to be called if terminal
@@ -163,6 +275,12 @@ impl TerminalFindModel {
                 ctx.emit(FindEvent::RanFind);
             }
         } else {
+            // A background scan reads the current grids as it goes and refreshes the newest block
+            // when it finishes.
+            if self.scan_in_progress {
+                return;
+            }
+
             // Find the last block index. This is the only block whose state may change.
             let last_block_index = self
                 .terminal_model
@@ -223,6 +341,7 @@ impl TerminalFindModel {
 
     /// Clears matches in the active find run, if any.
     pub fn clear_matches(&mut self, ctx: &mut ModelContext<Self>) {
+        self.cancel_scan();
         if self.terminal_model.lock().is_alt_screen_active() {
             if let Some(run) = self.alt_screen_find_run.take() {
                 self.alt_screen_find_run = Some(run.cleared());
