@@ -42,6 +42,24 @@ define_settings_group!(GeneralSettings, settings: [
         toml_path: "general.persist_conversations",
         description: "Whether to persist agent conversations to the local database so they appear in /conversations history. Independent of session restore.",
     },
+    add_app_as_login_item: LoginItem {
+        type: bool,
+        default: false,
+        supported_platforms: SupportedPlatforms::WINDOWS,
+        sync_to_cloud: SyncToCloud::Never,
+        private: false,
+        toml_path: "general.login_item",
+        description: "Whether to launch Warp automatically when you log in.",
+    },
+    // Set once registered, so a user who removes the entry from the OS startup UI
+    // isn't silently re-added until they retoggle the setting.
+    app_added_as_login_item: AppAddedAsLoginItem {
+        type: bool,
+        default: false,
+        supported_platforms: SupportedPlatforms::WINDOWS,
+        sync_to_cloud: SyncToCloud::Never,
+        private: true,
+    },
     link_tooltip: LinkTooltip {
         type: bool,
         default: true,
