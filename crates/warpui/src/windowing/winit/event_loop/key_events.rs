@@ -88,6 +88,11 @@ pub fn convert_keyboard_input_event(
 
     let key_without_modifiers = get_key_without_modifiers(&input);
 
+    #[cfg(windows)]
+    let win32 = win32_key_info(&input.physical_key);
+    #[cfg(not(windows))]
+    let win32 = None;
+
     let shift = window_state.modifiers.shift_key();
 
     let logical_key = match &input.logical_key {
@@ -148,9 +153,104 @@ pub fn convert_keyboard_input_event(
             left_alt: window_state.left_alt_pressed,
             right_alt: window_state.right_alt_pressed,
             key_without_modifiers,
+            win32,
         },
         is_composing: false,
     })
+}
+
+/// Windows virtual-key code and scan code for the physical key, used for ConPTY
+/// win32-input-mode. None on other platforms or for keys outside the table.
+#[cfg(windows)]
+fn win32_key_info(
+    physical_key: &winit::keyboard::PhysicalKey,
+) -> Option<crate::event::Win32KeyInfo> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{MapVirtualKeyW, MAPVK_VK_TO_VSC};
+    use winit::keyboard::{KeyCode, PhysicalKey};
+
+    let PhysicalKey::Code(code) = physical_key else {
+        return None;
+    };
+    let vk: u16 = match code {
+        KeyCode::KeyA => 0x41,
+        KeyCode::KeyB => 0x42,
+        KeyCode::KeyC => 0x43,
+        KeyCode::KeyD => 0x44,
+        KeyCode::KeyE => 0x45,
+        KeyCode::KeyF => 0x46,
+        KeyCode::KeyG => 0x47,
+        KeyCode::KeyH => 0x48,
+        KeyCode::KeyI => 0x49,
+        KeyCode::KeyJ => 0x4A,
+        KeyCode::KeyK => 0x4B,
+        KeyCode::KeyL => 0x4C,
+        KeyCode::KeyM => 0x4D,
+        KeyCode::KeyN => 0x4E,
+        KeyCode::KeyO => 0x4F,
+        KeyCode::KeyP => 0x50,
+        KeyCode::KeyQ => 0x51,
+        KeyCode::KeyR => 0x52,
+        KeyCode::KeyS => 0x53,
+        KeyCode::KeyT => 0x54,
+        KeyCode::KeyU => 0x55,
+        KeyCode::KeyV => 0x56,
+        KeyCode::KeyW => 0x57,
+        KeyCode::KeyX => 0x58,
+        KeyCode::KeyY => 0x59,
+        KeyCode::KeyZ => 0x5A,
+        KeyCode::Digit0 => 0x30,
+        KeyCode::Digit1 => 0x31,
+        KeyCode::Digit2 => 0x32,
+        KeyCode::Digit3 => 0x33,
+        KeyCode::Digit4 => 0x34,
+        KeyCode::Digit5 => 0x35,
+        KeyCode::Digit6 => 0x36,
+        KeyCode::Digit7 => 0x37,
+        KeyCode::Digit8 => 0x38,
+        KeyCode::Digit9 => 0x39,
+        KeyCode::Enter => 0x0D,
+        KeyCode::Tab => 0x09,
+        KeyCode::Backspace => 0x08,
+        KeyCode::Escape => 0x1B,
+        KeyCode::Space => 0x20,
+        KeyCode::ArrowLeft => 0x25,
+        KeyCode::ArrowUp => 0x26,
+        KeyCode::ArrowRight => 0x27,
+        KeyCode::ArrowDown => 0x28,
+        KeyCode::Home => 0x24,
+        KeyCode::End => 0x23,
+        KeyCode::PageUp => 0x21,
+        KeyCode::PageDown => 0x22,
+        KeyCode::Insert => 0x2D,
+        KeyCode::Delete => 0x2E,
+        KeyCode::F1 => 0x70,
+        KeyCode::F2 => 0x71,
+        KeyCode::F3 => 0x72,
+        KeyCode::F4 => 0x73,
+        KeyCode::F5 => 0x74,
+        KeyCode::F6 => 0x75,
+        KeyCode::F7 => 0x76,
+        KeyCode::F8 => 0x77,
+        KeyCode::F9 => 0x78,
+        KeyCode::F10 => 0x79,
+        KeyCode::F11 => 0x7A,
+        KeyCode::F12 => 0x7B,
+        KeyCode::Semicolon => 0xBA,
+        KeyCode::Equal => 0xBB,
+        KeyCode::Comma => 0xBC,
+        KeyCode::Minus => 0xBD,
+        KeyCode::Period => 0xBE,
+        KeyCode::Slash => 0xBF,
+        KeyCode::Backquote => 0xC0,
+        KeyCode::BracketLeft => 0xDB,
+        KeyCode::Backslash => 0xDC,
+        KeyCode::BracketRight => 0xDD,
+        KeyCode::Quote => 0xDE,
+        _ => return None,
+    };
+    // SAFETY: `MapVirtualKeyW` has no preconditions.
+    let scan_code = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC) } as u16;
+    Some(crate::event::Win32KeyInfo { vk, scan_code })
 }
 
 pub fn text_fallback_event_for_unconverted_key(

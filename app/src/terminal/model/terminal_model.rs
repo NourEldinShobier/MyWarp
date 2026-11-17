@@ -468,6 +468,10 @@ pub struct TerminalModel {
 
     alt_screen_active: bool,
 
+    /// ConPTY win32-input-mode (?9001), set once by ConPTY at startup, so it is kept here
+    /// rather than on a per-block grid.
+    win32_input_mode: bool,
+
     /// Stack of saved window titles. When a title is popped from this stack, the `title` for the
     /// term is set.
     title_stack: Vec<Option<String>>,
@@ -1138,6 +1142,7 @@ impl TerminalModel {
             block_list,
             blocklist_has_been_cleared: false,
             alt_screen_active: false,
+            win32_input_mode: false,
             title_stack: Vec::new(),
             title: None,
             custom_title: None,
@@ -2151,6 +2156,9 @@ impl TerminalModel {
     }
 
     pub fn is_term_mode_set(&self, mode: TermMode) -> bool {
+        if mode.bits() == TermMode::WIN32_INPUT.bits() {
+            return self.win32_input_mode;
+        }
         if self.alt_screen_active {
             return self.alt_screen().is_mode_set(mode);
         }
@@ -2880,6 +2888,10 @@ impl ansi::Handler for TerminalModel {
             self.enter_alt_screen(save_cursor_and_clear_screen);
             return;
         }
+        if mode == ansi::Mode::Win32Input {
+            self.win32_input_mode = true;
+            return;
+        }
 
         self.alt_screen.set_mode(mode);
         self.block_list.set_mode(mode);
@@ -2897,6 +2909,10 @@ impl ansi::Handler for TerminalModel {
             ansi::Mode::SyncOutput => {
                 // When synchronized output is turned off, we should redraw.
                 self.event_proxy.send_wakeup_event();
+            }
+            ansi::Mode::Win32Input => {
+                self.win32_input_mode = false;
+                return;
             }
             _ => {}
         }

@@ -20,6 +20,8 @@ struct MockHandler {
     identity_reported: bool,
     d_proto_hooks: Vec<DProtoHook>,
     pluggable_notifications: Vec<(Option<String>, String)>,
+    /// Last set (true) / unset (false) of win32-input-mode (?9001).
+    win32_input_mode: Option<bool>,
 }
 
 impl Handler for MockHandler {
@@ -132,9 +134,17 @@ impl Handler for MockHandler {
         ScrollDelta::zero()
     }
 
-    fn set_mode(&mut self, _mode: super::Mode) {}
+    fn set_mode(&mut self, mode: super::Mode) {
+        if mode == super::Mode::Win32Input {
+            self.win32_input_mode = Some(true);
+        }
+    }
 
-    fn unset_mode(&mut self, _: super::Mode) {}
+    fn unset_mode(&mut self, mode: super::Mode) {
+        if mode == super::Mode::Win32Input {
+            self.win32_input_mode = Some(false);
+        }
+    }
 
     fn set_scrolling_region(&mut self, _top: usize, _bottom: Option<usize>) {}
 
@@ -245,6 +255,7 @@ impl Default for MockHandler {
             identity_reported: false,
             d_proto_hooks: Vec::new(),
             pluggable_notifications: Vec::new(),
+            win32_input_mode: None,
         }
     }
 }
@@ -261,6 +272,15 @@ fn parse_bytes(bytes: &[u8]) -> (Processor, MockHandler) {
     parser.parse_bytes(&mut handler, bytes, &mut io::sink());
 
     (parser, handler)
+}
+
+#[test]
+fn parse_win32_input_mode() {
+    let (_, handler) = parse_bytes(b"\x1b[?9001h");
+    assert_eq!(handler.win32_input_mode, Some(true));
+
+    let (_, handler) = parse_bytes(b"\x1b[?9001l");
+    assert_eq!(handler.win32_input_mode, Some(false));
 }
 
 #[test]

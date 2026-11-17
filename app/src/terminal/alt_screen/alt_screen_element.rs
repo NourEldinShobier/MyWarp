@@ -6,7 +6,8 @@ use crate::terminal::find::TerminalFindModel;
 use crate::terminal::grid_renderer::CellGlyphCache;
 use crate::terminal::meta_shortcuts::handle_keystroke_despite_composing;
 use crate::terminal::model::escape_sequences::{
-    maybe_kitty_keyboard_escape_sequence, KeystrokeWithDetails, ToEscapeSequence,
+    maybe_kitty_keyboard_escape_sequence, maybe_win32_input_escape_sequence,
+    KeystrokeWithDetails, ToEscapeSequence,
 };
 use crate::terminal::model::grid::grid_handler::{Link, TermMode};
 use crate::terminal::model::grid::{Dimensions, RespectDisplayedOutput};
@@ -867,6 +868,15 @@ impl Element for AltScreenElement {
                     || (*is_composing && !handle_keystroke_despite_composing(keystroke))
                 {
                     return false;
+                }
+                if let Some(escape_sequence) = maybe_win32_input_escape_sequence(
+                    keystroke,
+                    details,
+                    chars.as_str(),
+                    self.model.lock().deref(),
+                ) {
+                    ctx.dispatch_typed_action(TerminalAction::ControlSequence(escape_sequence));
+                    return true;
                 }
                 if let Some(escape_sequence) = (KeystrokeWithDetails {
                     keystroke,

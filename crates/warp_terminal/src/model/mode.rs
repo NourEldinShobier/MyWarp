@@ -54,6 +54,9 @@ bitflags! {
         /// that want both the semantic key information and the resulting text.
         const KEYBOARD_REPORT_ASSOCIATED_TEXT  = 0b0100_0000_0000_0000_0000_0000;
 
+        /// ConPTY win32-input-mode (DEC private mode 9001). Not part of KEYBOARD_PROTOCOL.
+        const WIN32_INPUT                      = 0b1000_0000_0000_0000_0000_0000;
+
         const KEYBOARD_PROTOCOL = Self::KEYBOARD_DISAMBIGUATE_ESCAPE.bits()
             | Self::KEYBOARD_REPORT_EVENT_TYPES.bits()
             | Self::KEYBOARD_REPORT_ALTERNATE_KEYS.bits()

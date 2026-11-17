@@ -1029,6 +1029,8 @@ impl ansi::Handler for GridHandler {
                     .send_terminal_event(Event::CursorBlinkingChange(true));
             }
             ansi::Mode::SyncOutput => {}
+            // Tracked on the TerminalModel, not per grid.
+            ansi::Mode::Win32Input => {}
         }
     }
 

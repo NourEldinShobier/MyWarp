@@ -1,3 +1,4 @@
+use warpui::event::{KeyEventDetails, Win32KeyInfo};
 use warpui::keymap::Keystroke;
 use warpui::platform::OperatingSystem;
 
@@ -1184,4 +1185,80 @@ fn test_fn_keystroke_with_cmd_modifier() {
         (cmd_shift("f5"), b"\x1b[15;10~".to_vec()),
     ];
     validate_keystroke_test_cases(cases, &mock);
+}
+
+fn ctrl_key(key: &str) -> Keystroke {
+    Keystroke {
+        ctrl: true,
+        key: key.to_string(),
+        ..Default::default()
+    }
+}
+
+fn win32_details(vk: u16, scan_code: u16) -> KeyEventDetails {
+    KeyEventDetails {
+        win32: Some(Win32KeyInfo { vk, scan_code }),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn test_win32_input_mode_ctrl_chords() {
+    let mut mock = TerminalModelMock::new();
+    mock.set_mode(TermMode::WIN32_INPUT);
+
+    // Ctrl+J: VK 0x4A, scan 0x24, Uc 0x0A, Cs LEFT_CTRL (0x8).
+    assert_eq!(
+        maybe_win32_input_escape_sequence(&ctrl_key("j"), &win32_details(0x4A, 0x24), "\n", &mock),
+        Some(b"\x1b[74;36;10;1;8;1_".to_vec())
+    );
+    // Ctrl+; (VK_OEM_1) has no character.
+    assert_eq!(
+        maybe_win32_input_escape_sequence(&ctrl_key(";"), &win32_details(0xBA, 0x27), "", &mock),
+        Some(b"\x1b[186;39;0;1;8;1_".to_vec())
+    );
+    // Ctrl+' (VK_OEM_7) has no character.
+    assert_eq!(
+        maybe_win32_input_escape_sequence(&ctrl_key("'"), &win32_details(0xDE, 0x28), "", &mock),
+        Some(b"\x1b[222;40;0;1;8;1_".to_vec())
+    );
+}
+
+#[test]
+fn test_win32_input_mode_not_applied_when_inactive_or_unmodified() {
+    let ctrl_j = ctrl_key("j");
+    let details = win32_details(0x4A, 0x24);
+
+    // Mode 9001 not set by the child.
+    let mock = TerminalModelMock::new();
+    assert_eq!(
+        maybe_win32_input_escape_sequence(&ctrl_j, &details, "\n", &mock),
+        None
+    );
+
+    let mut mock = TerminalModelMock::new();
+    mock.set_mode(TermMode::WIN32_INPUT);
+    // No virtual key available.
+    assert_eq!(
+        maybe_win32_input_escape_sequence(&ctrl_j, &KeyEventDetails::default(), "\n", &mock),
+        None
+    );
+    // Plain printable key keeps the legacy path.
+    let plain_j = Keystroke {
+        key: "j".to_string(),
+        ..Default::default()
+    };
+    assert_eq!(
+        maybe_win32_input_escape_sequence(&plain_j, &details, "j", &mock),
+        None
+    );
+    // AltGr (reported as Ctrl+Alt) keeps the typed character.
+    let altgr = KeyEventDetails {
+        right_alt: true,
+        ..details
+    };
+    assert_eq!(
+        maybe_win32_input_escape_sequence(&ctrl_j, &altgr, "j", &mock),
+        None
+    );
 }

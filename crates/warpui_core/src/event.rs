@@ -67,6 +67,14 @@ pub struct KeyEventDetails {
     pub right_alt: bool,
     /// The key that would have been produced without any modifiers (including Shift).
     pub key_without_modifiers: Option<String>,
+    /// Windows virtual-key code and scan code of the physical key, for ConPTY win32-input-mode.
+    pub win32: Option<Win32KeyInfo>,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Win32KeyInfo {
+    pub vk: u16,
+    pub scan_code: u16,
 }
 
 #[derive(Copy, Clone, Debug, Default)]

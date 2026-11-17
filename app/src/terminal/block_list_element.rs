@@ -94,7 +94,8 @@ use crate::terminal::model::terminal_model::BlockIndex;
 use crate::terminal::warpify::SubshellSource;
 
 use crate::terminal::model::escape_sequences::{
-    maybe_kitty_keyboard_escape_sequence, KeystrokeWithDetails, ToEscapeSequence,
+    maybe_kitty_keyboard_escape_sequence, maybe_win32_input_escape_sequence,
+    KeystrokeWithDetails, ToEscapeSequence,
 };
 
 /// The number of pixels at the bottom of padding where selection scrolling is performed.
@@ -4620,6 +4621,15 @@ impl Element for BlockListElement {
                 if !*is_composing
                     || (handle_keystroke_despite_composing(keystroke) && in_long_running_command)
                 {
+                    if let Some(escape_sequence) = maybe_win32_input_escape_sequence(
+                        keystroke,
+                        details,
+                        chars.as_str(),
+                        self.model.lock().deref(),
+                    ) {
+                        ctx.dispatch_typed_action(TerminalAction::ControlSequence(escape_sequence));
+                        return true;
+                    }
                     if let Some(escape_sequence) = (KeystrokeWithDetails {
                         keystroke,
                         key_without_modifiers: details.key_without_modifiers.as_deref(),

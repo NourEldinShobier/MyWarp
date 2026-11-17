@@ -131,7 +131,12 @@ pub(super) fn spawn(
         pipes::create_async_anonymous_pipe().map_err(PtySpawnError::CreatePipeFailed)?;
 
     // Create the pseudoconsole, giving it the handle to the client side of the pipe.
-    let pty_handle = match unsafe { conpty_api.create(size.to_coord(), client, 0) } {
+    // PSEUDOCONSOLE_WIN32_INPUT_MODE (0x4), as Windows Terminal does, lets the child enable
+    // win32-input-mode (?9001h) so Ctrl+key chords reach it with their real virtual keys.
+    const PSEUDOCONSOLE_WIN32_INPUT_MODE: u32 = 0x4;
+    let pty_handle = match unsafe {
+        conpty_api.create(size.to_coord(), client, PSEUDOCONSOLE_WIN32_INPUT_MODE)
+    } {
         Ok(pty_handle) => pty_handle,
         Err(err) => return Err(PtySpawnError::CreatePseudoConsoleFailed(err)),
     };

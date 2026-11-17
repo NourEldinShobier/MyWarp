@@ -10,9 +10,11 @@ use super::{
 };
 
 mod kitty_keyboard_protocol;
+mod win32_input_mode;
 
 use kitty_keyboard_protocol::maybe_convert_keystroke_to_csi_u;
 pub use kitty_keyboard_protocol::{maybe_kitty_keyboard_escape_sequence, modifier_key_to_csi_u};
+pub use win32_input_mode::maybe_win32_input_escape_sequence;
 
 /// C0 set of 7-bit control characters (from ANSI X3.4-1977).
 #[allow(non_snake_case)]
