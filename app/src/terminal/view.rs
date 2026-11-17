@@ -626,6 +626,11 @@ pub const WAKEUP_THROTTLE_PERIOD: Duration =
 /// keeps coming is still throttled to [`MAX_WAKEUPS_PER_SECOND`].
 const WAKEUP_AFTER_QUIET_PERIOD: Duration = Duration::from_millis(1);
 
+/// Minimum time between find / block filter rescans of the active block while output streams in.
+/// Each rescan walks the whole block with the terminal model lock held, so doing it on every
+/// wakeup stalls the PTY reader and rendering. A trailing rescan runs after output settles.
+const ACTIVE_BLOCK_RESCAN_PERIOD: Duration = Duration::from_millis(250);
+
 pub const EXECUTE_PENDING_COMMAND_DELAY: Duration = Duration::from_millis(100);
 
 pub const WARP_PROMPT_HEIGHT_LINES: f32 = 0.9;
@@ -2622,6 +2627,12 @@ pub struct TerminalView {
 
     find_model: ModelHandle<TerminalFindModel>,
 
+    /// When the active block was last rescanned for find / block filter matches on a wakeup.
+    last_active_block_rescan: Option<Instant>,
+
+    /// `true` if a trailing rescan is already scheduled.
+    pending_active_block_rescan: bool,
+
     warpify_state: WarpifyState,
 
     /// The keystroke bound to canceling a command.
@@ -3307,6 +3318,15 @@ impl TerminalView {
         };
 
         let find_model = ctx.add_model(|_| TerminalFindModel::new(model.clone()));
+        // Large finds run in the background, so the first match can arrive after `run_find`
+        // returned.
+        ctx.subscribe_to_model(&find_model, |me, _, event, ctx| match event {
+            crate::view_components::find::FindEvent::UpdatedFocusedMatch => {
+                me.scroll_to_match(ctx);
+                ctx.notify();
+            }
+            crate::view_components::find::FindEvent::RanFind => ctx.notify(),
+        });
 
         ctx.subscribe_to_model(
             &TerminalSettings::handle(ctx),
@@ -4044,6 +4064,8 @@ impl TerminalView {
             input_position_id,
             input_hoverable_handle: Default::default(),
             find_model,
+            last_active_block_rescan: None,
+            pending_active_block_rescan: false,
             warpify_state: Default::default(),
             cancel_command_keystroke: keybinding_name_to_keystroke(CANCEL_COMMAND_KEYBINDING, ctx),
             is_file_drop_target: false,
@@ -7807,19 +7829,45 @@ impl TerminalView {
     /// such as a state change or terminal wakeup to update the view context.
     fn handle_terminal_wakeup(&mut self, _: (), ctx: &mut ViewContext<Self>) {
         let is_find_bar_open = self.find_model.as_ref(ctx).is_find_bar_open();
-        // If find bar is active, we update the matches for the last/active block or the alt screen.
-        if is_find_bar_open {
-            self.find_model.update(ctx, |find_model, ctx| {
-                find_model.rerun_find_on_active_grid(ctx);
-            });
-        }
+        let has_active_filter = self
+            .model
+            .lock()
+            .block_list()
+            .active_block()
+            .has_active_filter();
 
-        // For simplicity, we simply rescan the entire block for block filter matches.
-        let has_active_filter = {
-            let mut model = self.model.lock();
-            model.block_list_mut().maybe_refilter_active_block_output();
-            model.block_list().active_block().has_active_filter()
-        };
+        // If the find bar is open, we update the matches for the last/active block or the alt
+        // screen. For simplicity, we simply rescan the entire block for block filter matches.
+        // Both rescans are O(block size) with the model lock held, so they are rate-limited.
+        if is_find_bar_open || has_active_filter {
+            let since_last_rescan = self.last_active_block_rescan.map(|t| t.elapsed());
+            match since_last_rescan {
+                Some(elapsed) if elapsed < ACTIVE_BLOCK_RESCAN_PERIOD => {
+                    if !self.pending_active_block_rescan {
+                        self.pending_active_block_rescan = true;
+                        ctx.spawn(
+                            Timer::after(ACTIVE_BLOCK_RESCAN_PERIOD - elapsed),
+                            |me, _, ctx| {
+                                me.pending_active_block_rescan = false;
+                                me.handle_terminal_wakeup((), ctx);
+                            },
+                        );
+                    }
+                }
+                _ => {
+                    self.last_active_block_rescan = Some(Instant::now());
+                    if is_find_bar_open {
+                        self.find_model.update(ctx, |find_model, ctx| {
+                            find_model.rerun_find_on_active_grid(ctx);
+                        });
+                    }
+                    self.model
+                        .lock()
+                        .block_list_mut()
+                        .maybe_refilter_active_block_output();
+                }
+            }
+        }
         self.quick_wakeups
             .store(!is_find_bar_open && !has_active_filter, Ordering::Relaxed);
 

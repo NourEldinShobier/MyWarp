@@ -16,13 +16,85 @@ use crate::terminal::{
     GridType, TerminalModel,
 };
 
-use super::{BlockListFindRun, BlockListMatch};
+use super::{compile_dfas, scan_item, scan_items, BlockListFindRun, BlockListMatch};
 use crate::view_components::find::FindDirection;
+use parking_lot::FairMutex;
 
 impl BlockListFindRun {
     fn all_matches(&self) -> &[BlockListMatch] {
         &self.matches[..]
     }
+}
+
+#[test]
+fn test_scan_batches_match_sync_run() {
+    App::test((), |mut app| async move {
+        let mut mock_terminal_model = TerminalModel::mock(None, None);
+        mock_terminal_model.simulate_block("foobar", "foo\r\nbar\r\n");
+        mock_terminal_model.simulate_block("barbaz", "bar baz\r\n");
+
+        let options = FindOptions {
+            query: Some("bar".to_owned().into()),
+            ..Default::default()
+        };
+        let dfas = compile_dfas(&options).expect("valid query");
+        let terminal_model = FairMutex::new(mock_terminal_model);
+        let items = scan_items(terminal_model.lock().block_list());
+        let mut run = BlockListFindRun::new_scanning(
+            options,
+            dfas.clone(),
+            BlockSortDirection::MostRecentLast,
+        );
+
+        let mut first_match_flags = vec![];
+        app.update(|ctx| {
+            for item in items {
+                let batch = scan_item(
+                    item,
+                    &dfas,
+                    &terminal_model,
+                    BlockSortDirection::MostRecentLast,
+                );
+                first_match_flags.push(run.append_batch(batch, &HashMap::new(), ctx));
+            }
+        });
+
+        // Same matches, in the same order, as `test_run_find_on_block_list`.
+        assert_eq!(
+            run.matches().collect_vec(),
+            vec![
+                &BlockListMatch::CommandBlock(BlockGridMatch {
+                    grid_type: GridType::Output,
+                    range: Point { row: 0, col: 0 }..=Point { row: 0, col: 2 },
+                    block_index: 2.into(),
+                    is_filtered: false,
+                }),
+                &BlockListMatch::CommandBlock(BlockGridMatch {
+                    grid_type: GridType::PromptAndCommand,
+                    range: Point { row: 0, col: 0 }..=Point { row: 0, col: 2 },
+                    block_index: 2.into(),
+                    is_filtered: false,
+                }),
+                &BlockListMatch::CommandBlock(BlockGridMatch {
+                    grid_type: GridType::Output,
+                    range: Point { row: 1, col: 0 }..=Point { row: 1, col: 2 },
+                    block_index: 1.into(),
+                    is_filtered: false,
+                }),
+                &BlockListMatch::CommandBlock(BlockGridMatch {
+                    grid_type: GridType::PromptAndCommand,
+                    range: Point { row: 0, col: 3 }..=Point { row: 0, col: 5 },
+                    block_index: 1.into(),
+                    is_filtered: false,
+                }),
+            ]
+        );
+        assert_eq!(run.focused_match_index(), Some(0));
+        assert_eq!(
+            first_match_flags.into_iter().flatten().collect_vec(),
+            vec![true, false]
+        );
+    });
 }
 
 #[test]

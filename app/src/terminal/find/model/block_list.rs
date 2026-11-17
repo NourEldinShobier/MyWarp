@@ -1,7 +1,8 @@
 //! This module implements terminal find functionality for the blocklist.
-use std::{collections::HashMap, iter, ops::RangeInclusive};
+use std::{collections::HashMap, iter, ops::RangeInclusive, sync::Arc};
 
 use itertools::Itertools;
+use parking_lot::FairMutex;
 use warpui::{units::Lines, AppContext, EntityId};
 
 use crate::terminal::{
@@ -14,6 +15,7 @@ use crate::terminal::{
         find::{FindConfig, RegexDFAs},
         index::Point,
         terminal_model::{BlockIndex, BlockSortDirection},
+        TerminalModel,
     },
     GridType,
 };
@@ -23,6 +25,97 @@ use super::{
     rich_content::{FindableRichContentHandle, RichContentMatchId},
     FindOptions,
 };
+
+/// Block lists taller than this many lines are searched in the background (see
+/// [`should_scan_async`]); smaller ones are searched synchronously.
+const ASYNC_FIND_MIN_LINES: f64 = 10_000.;
+
+/// Compiles the regex DFAs for the query in `options`, if there is a valid query.
+pub(super) fn compile_dfas(options: &FindOptions) -> Option<Arc<RegexDFAs>> {
+    let query = options.query.as_ref()?;
+    RegexDFAs::new_with_config(
+        query.as_str(),
+        FindConfig {
+            is_regex_enabled: options.is_regex_enabled,
+            is_case_sensitive: options.is_case_sensitive,
+        },
+    )
+    .ok()
+    .map(Arc::new)
+}
+
+/// Returns `true` if a find over the whole blocklist is big enough to be scanned in the
+/// background, one block at a time, instead of holding the terminal model lock for the whole scan.
+pub(super) fn should_scan_async(options: &FindOptions, block_list: &BlockList) -> bool {
+    options.query.is_some()
+        && options.blocks_to_include_in_results.is_none()
+        && block_list.block_heights().summary().height > Lines::new(ASYNC_FIND_MIN_LINES)
+}
+
+/// One unit of work of a background find scan.
+pub(super) enum ScanItem {
+    Block(BlockIndex),
+    RichContent { view_id: EntityId, index: TotalIndex },
+}
+
+/// The result of scanning one [`ScanItem`].
+pub(super) enum ScanBatch {
+    Matches(Vec<BlockListMatch>),
+    /// Rich content needs the `AppContext`, so it is searched on the main thread.
+    RichContent { view_id: EntityId, index: TotalIndex },
+}
+
+/// Returns the blocks and rich content items to search, most recent first.
+pub(super) fn scan_items(block_list: &BlockList) -> Vec<ScanItem> {
+    let mut items = vec![];
+    let mut cursor = block_list
+        .block_heights()
+        .cursor::<BlockHeight, BlockHeightSummary>();
+    cursor.descend_to_last_item(block_list.block_heights());
+
+    while let Some(item) = cursor.item() {
+        match item {
+            BlockHeightItem::Block(height) if height.into_lines() > Lines::zero() => {
+                items.push(ScanItem::Block(cursor.start().block_count.into()));
+            }
+            BlockHeightItem::RichContent(RichContentItem {
+                view_id,
+                last_laid_out_height,
+                ..
+            }) if last_laid_out_height.into_lines() > Lines::zero() => {
+                items.push(ScanItem::RichContent {
+                    view_id: *view_id,
+                    index: cursor.start().total_count.into(),
+                });
+            }
+            _ => (),
+        }
+        cursor.prev();
+    }
+    items
+}
+
+/// Scans one item, holding the terminal model lock only for the duration of that item.
+pub(super) fn scan_item(
+    item: ScanItem,
+    dfas: &RegexDFAs,
+    terminal_model: &FairMutex<TerminalModel>,
+    block_sort_direction: BlockSortDirection,
+) -> ScanBatch {
+    match item {
+        ScanItem::Block(block_index) => {
+            let terminal_model = terminal_model.lock();
+            ScanBatch::Matches(
+                terminal_model
+                    .block_list()
+                    .block_at(block_index)
+                    .map(|block| run_find_on_block(dfas, block, block_index, block_sort_direction))
+                    .unwrap_or_default(),
+            )
+        }
+        ScanItem::RichContent { view_id, index } => ScanBatch::RichContent { view_id, index },
+    }
+}
 
 /// Runs a find operation on the blocklist using the given `options` and returns a
 /// `BlockListFindRun` with the results.
@@ -36,16 +129,7 @@ pub(super) fn run_find_on_block_list(
     block_sort_direction: BlockSortDirection,
     ctx: &mut AppContext,
 ) -> BlockListFindRun {
-    let Some(dfas) = options.query.as_ref().and_then(|query| {
-        RegexDFAs::new_with_config(
-            query.as_str(),
-            FindConfig {
-                is_regex_enabled: options.is_regex_enabled,
-                is_case_sensitive: options.is_case_sensitive,
-            },
-        )
-        .ok()
-    }) else {
+    let Some(dfas) = compile_dfas(&options) else {
         // Clear rich content matches.
         for rich_content_view in findable_rich_content_views.values() {
             rich_content_view.clear_matches(ctx);
@@ -124,48 +208,54 @@ fn run_find_on_sumtree(
     matches: &mut Vec<BlockListMatch>,
     ctx: &mut AppContext,
 ) {
-    let mut cursor = block_list
-        .block_heights()
-        .cursor::<BlockHeight, BlockHeightSummary>();
-    cursor.descend_to_last_item(block_list.block_heights());
-
-    while let Some(item) = cursor.item() {
+    for item in scan_items(block_list) {
         match item {
-            BlockHeightItem::Block(height) if height.into_lines() > Lines::zero() => {
-                let block_index = cursor.start().block_count;
-                if let Some(block) = block_list.block_at(block_index.into()) {
+            ScanItem::Block(block_index) => {
+                if let Some(block) = block_list.block_at(block_index) {
                     matches.extend(run_find_on_block(
                         dfas,
                         block,
-                        block_index.into(),
+                        block_index,
                         block_sort_direction,
                     ));
                 }
             }
-            BlockHeightItem::RichContent(RichContentItem {
+            ScanItem::RichContent { view_id, index } => matches.extend(run_find_on_rich_content(
+                options,
                 view_id,
-                last_laid_out_height,
-                ..
-            }) if last_laid_out_height.into_lines() > Lines::zero() => {
-                if let Some(findable_view) = rich_content_views.get(view_id) {
-                    let mut rich_content_matches = findable_view.run_find(options, ctx);
-                    if matches!(block_sort_direction, BlockSortDirection::MostRecentLast) {
-                        rich_content_matches.reverse();
-                    }
-
-                    matches.extend(rich_content_matches.into_iter().map(|match_id| {
-                        BlockListMatch::RichContent {
-                            match_id,
-                            view_id: *view_id,
-                            index: cursor.start().total_count.into(),
-                        }
-                    }));
-                }
-            }
-            _ => (),
+                index,
+                rich_content_views,
+                block_sort_direction,
+                ctx,
+            )),
         }
-        cursor.prev();
     }
+}
+
+/// Runs a find operation on the rich content view `view_id`, if it is findable.
+fn run_find_on_rich_content(
+    options: &FindOptions,
+    view_id: EntityId,
+    index: TotalIndex,
+    rich_content_views: &HashMap<EntityId, Box<dyn FindableRichContentHandle>>,
+    block_sort_direction: BlockSortDirection,
+    ctx: &mut AppContext,
+) -> Vec<BlockListMatch> {
+    let Some(findable_view) = rich_content_views.get(&view_id) else {
+        return vec![];
+    };
+    let mut rich_content_matches = findable_view.run_find(options, ctx);
+    if matches!(block_sort_direction, BlockSortDirection::MostRecentLast) {
+        rich_content_matches.reverse();
+    }
+    rich_content_matches
+        .into_iter()
+        .map(|match_id| BlockListMatch::RichContent {
+            match_id,
+            view_id,
+            index,
+        })
+        .collect()
 }
 
 /// Runs a find operation on the given block and returns the resulting vector of `BlockListMatch`es.
@@ -330,7 +420,7 @@ pub struct BlockListFindRun {
     /// Compiled [`RegexDFAs`] for the find query.
     ///
     /// If the query in `options` is Some(), this is guaranteed to be `Some()`.
-    dfas: Option<RegexDFAs>,
+    dfas: Option<Arc<RegexDFAs>>,
 
     /// Matches found in the blocklist.
     ///
@@ -361,6 +451,54 @@ pub struct BlockListFindRun {
 }
 
 impl BlockListFindRun {
+    /// Creates a run with no matches yet, to be filled by [`Self::append_batch`] as a background
+    /// scan progresses.
+    pub(super) fn new_scanning(
+        options: FindOptions,
+        dfas: Arc<RegexDFAs>,
+        block_sort_direction: BlockSortDirection,
+    ) -> Self {
+        Self {
+            options,
+            block_sort_direction,
+            dfas: Some(dfas),
+            matches: vec![],
+            raw_focused_match_index: None,
+        }
+    }
+
+    /// Appends the results of a background scan step, which must arrive in scan order.
+    ///
+    /// Returns `None` if there were no matches, `Some(true)` if these are the run's first matches
+    /// (which also become focused), and `Some(false)` otherwise.
+    pub(super) fn append_batch(
+        &mut self,
+        batch: ScanBatch,
+        rich_content_views: &HashMap<EntityId, Box<dyn FindableRichContentHandle>>,
+        ctx: &mut AppContext,
+    ) -> Option<bool> {
+        let new_matches = match batch {
+            ScanBatch::Matches(new_matches) => new_matches,
+            ScanBatch::RichContent { view_id, index } => run_find_on_rich_content(
+                &self.options,
+                view_id,
+                index,
+                rich_content_views,
+                self.block_sort_direction,
+                ctx,
+            ),
+        };
+        if new_matches.is_empty() {
+            return None;
+        }
+        let is_first = self.matches.is_empty();
+        self.matches.extend(new_matches);
+        if self.raw_focused_match_index.is_none() {
+            self.raw_focused_match_index = Some(0);
+        }
+        Some(is_first)
+    }
+
     /// Returns the UI focused match index, relative to the list of visible matches.
     pub fn focused_match_index(&self) -> Option<usize> {
         self.raw_focused_match_index.map(|focused_index| {
@@ -611,7 +749,7 @@ impl BlockListFindRun {
                         is_case_sensitive: self.options.is_case_sensitive,
                     },
                 ) {
-                    Ok(dfas) => Some(dfas),
+                    Ok(dfas) => Some(Arc::new(dfas)),
                     Err(e) => {
                         log::warn!(
                             "Failed to construct new RegexDFAs for cleared BlockListFindRun: {e:?}"
