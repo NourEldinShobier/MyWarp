@@ -263,6 +263,12 @@ impl ShellCommandExecutor {
         input: ExecuteActionInput,
         ctx: &mut ModelContext<Self>,
     ) -> impl Into<AnyActionExecution> {
+        let active_session = self.active_session.as_ref(ctx).session(ctx);
+        let current_working_directory = self
+            .active_session
+            .as_ref(ctx)
+            .current_working_directory()
+            .cloned();
         let model = self.terminal_model.lock();
 
         // Determine the action we want to take based on the input.
@@ -285,6 +291,52 @@ impl ShellCommandExecutor {
                     return ActionExecution::Sync(AIAgentActionResultType::RequestCommandOutput(
                         RequestCommandOutputResult::CancelledBeforeExecution,
                     ));
+                }
+                // Completed commands in remote sessions run through the session's own command
+                // executor (RemoteServerCommandExecutor, or the SSH ControlMaster fallback), not
+                // the visible PTY: hidden agent blocks over SSH can otherwise report a wrong exit
+                // code with empty output. Long-running commands stay on the PTY.
+                if *wait_until_completion {
+                    if let Some(session) = active_session.filter(|session| !session.is_local()) {
+                        let command = command.clone();
+                        let command_to_execute = command.clone();
+                        drop(model);
+
+                        return ActionExecution::new_async(
+                            async move {
+                                let result = session
+                                    .execute_command(
+                                        &command_to_execute,
+                                        current_working_directory.as_deref(),
+                                        None,
+                                        Default::default(),
+                                    )
+                                    .await;
+
+                                match result {
+                                    Ok(output) => {
+                                        let exit_code = output.exit_code().unwrap_or_else(|| {
+                                            ExitCode::from(if output.success() { 0 } else { 1 })
+                                        });
+                                        ActionResult::CommandFinished {
+                                            block_id: BlockId::new(),
+                                            output: String::from_utf8_lossy(output.output())
+                                                .into_owned(),
+                                            exit_code,
+                                        }
+                                    }
+                                    Err(error) => ActionResult::CommandFinished {
+                                        block_id: BlockId::new(),
+                                        output: format!(
+                                            "Remote command execution failed: {error:#}"
+                                        ),
+                                        exit_code: ExitCode::from(1),
+                                    },
+                                }
+                            },
+                            move |result, _| action_result_for_requested_command(command, result),
+                        );
+                    }
                 }
                 // Warp:同步等待型命令(wait_until_completion=true)无条件禁用 pager。
                 //
