@@ -1081,7 +1081,11 @@ impl EventLoop {
                 let window = downcast_window(window.as_ref());
                 window.handle_resize();
                 self.callbacks.for_window(window).window_resized(window);
-                self.callbacks.window_resized();
+                // A minimized window reports 0x0; don't trigger an app save for it.
+                let size = window.size();
+                if size.x() > 0. && size.y() > 0. {
+                    self.callbacks.window_resized();
+                }
             }
             ConvertedEvent::ModifierKeyChanged { key_code, state } => {
                 let mut window_callbacks = self.callbacks.for_window(window.as_ref());

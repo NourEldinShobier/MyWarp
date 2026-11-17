@@ -2457,6 +2457,10 @@ impl AppContext {
             resize_callback: Box::new(move |window, ctx| {
                 let origin = window.origin();
                 let size = window.size();
+                // A minimized window reports 0x0; don't store or lay out that size.
+                if size.x() <= 0. || size.y() <= 0. {
+                    return;
+                }
                 ctx.window_bounds
                     .insert(window_id, Some(RectF::new(origin, size)));
 

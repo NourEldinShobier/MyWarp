@@ -1022,6 +1022,12 @@ impl Window {
             return;
         };
 
+        // A minimized window reports a 0x0 size; don't reconfigure the surface for it.
+        let size = inner.window.inner_size();
+        if size.width == 0 || size.height == 0 {
+            return;
+        }
+
         // Force a recreation of the swap chain, in case it became outdated by
         // the resize.
         inner.surface_requires_reconfiguration = true;
