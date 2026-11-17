@@ -28,15 +28,16 @@ impl Pacing {
     /// `was_idle` is whether the item arrived with no wait running, i.e. after the stream had
     /// gone quiet; items that keep coming always arrive during a wait.
     fn wait_after_item(&mut self, now: Instant, was_idle: bool) -> Duration {
-        if let Some((quick_period, enabled)) = &self.quick
-            && was_idle
-            && enabled.load(Ordering::Relaxed)
-            && self
-                .last_quick_wait_at
-                .is_none_or(|last| now.duration_since(last) >= self.period * 2)
-        {
-            self.last_quick_wait_at = Some(now);
-            return *quick_period;
+        if let Some((quick_period, enabled)) = &self.quick {
+            if was_idle
+                && enabled.load(Ordering::Relaxed)
+                && self
+                    .last_quick_wait_at
+                    .is_none_or(|last| now.duration_since(last) >= self.period * 2)
+            {
+                self.last_quick_wait_at = Some(now);
+                return *quick_period;
+            }
         }
         self.period
     }
