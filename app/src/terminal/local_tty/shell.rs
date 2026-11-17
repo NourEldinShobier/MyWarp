@@ -7,6 +7,7 @@ use std::{
     process,
 };
 use typed_path::UnixPathBuf;
+use warpui::r#async::FutureExt as _;
 use warp_core::channel::{Channel, ChannelState};
 use warp_util::path::{canonicalize_git_bash_path, is_msys2_path, warp_shell_path};
 
@@ -472,8 +473,17 @@ impl WslShellStarter {
             .arg("--")
             .arg("printenv")
             .arg("SHELL")
+            // Dropping the future on timeout must also kill a hung wsl.exe.
+            .kill_on_drop(true)
             .output()
-            .await;
+            .with_timeout(std::time::Duration::from_secs(10))
+            .await
+            .unwrap_or_else(|_| {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "wsl.exe did not respond within 10s",
+                ))
+            });
         let shell_path = decode_wsl_path_result(command_result)?
             .to_string_lossy()
             .into_owned();
