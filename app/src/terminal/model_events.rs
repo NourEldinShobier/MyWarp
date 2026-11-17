@@ -7,7 +7,6 @@ use crate::terminal::event::{
     TerminalMode,
 };
 
-use crate::terminal::zmodem::ZmodemEvent;
 use crate::terminal::ClipboardType;
 use async_channel::Receiver;
 use instant::Instant;
@@ -73,13 +72,7 @@ impl ModelEventDispatcher {
     /// Sets the active session ID directly, for use in unit tests where there's no `Precmd` event.
     #[cfg(test)]
     pub fn set_active_session_id(&mut self, session_id: SessionId) {
-        self.set_active_session_id_for_test(Some(session_id));
-    }
-
-    /// Sets or clears the active session ID directly, for unit tests where there's no `Precmd` event.
-    #[cfg(test)]
-    pub fn set_active_session_id_for_test(&mut self, session_id: Option<SessionId>) {
-        self.active_session_id = session_id;
+        self.active_session_id = Some(session_id);
     }
 
     /// Emits the corresponding `ModelEvent` for the received `HandlerEvent` emitted by
@@ -312,7 +305,6 @@ impl ModelEventDispatcher {
             Event::PluggableNotification { title, body } => {
                 ModelEvent::PluggableNotification { title, body }
             }
-            Event::Zmodem(event) => ModelEvent::Zmodem(event),
             Event::ExitShell { session_id } => ModelEvent::ExitShell { session_id },
             _ => return,
         };
@@ -489,7 +481,6 @@ pub enum ModelEvent {
         title: Option<String>,
         body: String,
     },
-    Zmodem(ZmodemEvent),
     /// Emitted when an SSH session's `InitShell` is intercepted by the
     /// `SshRemoteServer` feature flag. `RemoteServerController` subscribes to
     /// this instead of `Handler(InitShell)` so `PtyController` never sees it.

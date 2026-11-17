@@ -236,7 +236,6 @@ warp_isolation_platform.workspace = true
 warp_ripgrep.workspace = true
 warp_managed_secrets.workspace = true
 warp_sync = { path = "../crates/warp_sync" }
-zmodem2.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block.workspace = true
@@ -578,7 +577,6 @@ default = [
     "settings_file",
     "ssh_tmux_wrapper",
     "onekey_prompt",
-    "lrzsz",
 ]
 # Enable this feature to automatically perform heap profiling.  NOTE: This will
 # substantially slow down program execution.
@@ -606,7 +604,6 @@ grep_tool = []
 gui = ["voice_input"]
 msys2_shells = []
 onekey_prompt = []
-lrzsz = []
 file_retrieval_tools = []
 welcome_tab = []
 get_started_tab = []
@@ -684,7 +681,7 @@ recording_mode = []
 # This feature should only be enabled when building a release bundle with
 # the bundle script, and can be used to conditionally enable functionality
 # accordingly.
-release_bundle = ["lrzsz", "rust-embed/debug-embed", "warp_core/release_bundle"]
+release_bundle = ["rust-embed/debug-embed", "warp_core/release_bundle"]
 render_agent_mode_output_markdown = []
 render_continuous_block_selections_with_single_border = []
 rich_history = []
