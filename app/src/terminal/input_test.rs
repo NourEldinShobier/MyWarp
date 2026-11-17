@@ -6809,6 +6809,46 @@ fn test_remove_ignored_suggestion_on_command_execution() {
 }
 
 #[test]
+fn test_rapid_enter_submits_only_once_per_block() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |view, _| view.input().clone());
+
+        // Both submissions in one update so the PTY controller cannot advance the model.
+        let (first, duplicate) = input.update(&mut app, |input, ctx| {
+            (
+                input.try_execute_command("", ctx),
+                input.try_execute_command("", ctx),
+            )
+        });
+
+        assert!(first);
+        assert!(!duplicate, "a second Enter must not submit into the same active block");
+    });
+}
+
+#[test]
+fn test_rapid_empty_commands_are_throttled_across_blocks() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |view, _| view.input().clone());
+
+        assert!(input.update(&mut app, |input, ctx| input.try_execute_command("", ctx)));
+
+        let second = input.update(&mut app, |input, ctx| {
+            // Emulate the shell advancing to a fresh block before the next Enter event.
+            input.last_submitted_block_id = None;
+            input.try_execute_command("", ctx)
+        });
+        assert!(!second, "rapid empty commands must be throttled across blocks");
+    });
+}
+
+#[test]
 fn test_remove_ignored_suggestion_on_ai_query_execution() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);

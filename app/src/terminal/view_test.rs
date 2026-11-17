@@ -811,6 +811,32 @@ fn restored_cli_subagent_windows_ctrl_c_does_not_write_to_pty() {
     });
 }
 
+#[test]
+fn ai_requested_commands_are_isolated_only_at_execution() {
+    let command = "set -x; cd /tmp; echo done";
+    assert_eq!(
+        isolate_ai_requested_command(command, Some(ShellType::Bash)),
+        format!("(\n{command}\n)")
+    );
+    assert_eq!(
+        isolate_ai_requested_command(command, Some(ShellType::Zsh)),
+        format!("(\n{command}\n)")
+    );
+    assert_eq!(
+        isolate_ai_requested_command(command, Some(ShellType::PowerShell)),
+        format!("& {{ {command} }}")
+    );
+}
+
+#[test]
+fn fish_command_is_escaped_before_subshell_execution() {
+    let command = "echo 'quoted' \\\\ path";
+    assert_eq!(
+        isolate_ai_requested_command(command, Some(ShellType::Fish)),
+        "command fish -c 'echo \\'quoted\\' \\\\\\\\ path'"
+    );
+}
+
 /// Test to verify that blocks created through normal execution
 /// have the correct local status set
 #[test]

@@ -238,7 +238,7 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
     rc::Rc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use string_offset::CharOffset;
 use vec1::Vec1;
@@ -370,6 +370,7 @@ impl DropTargetData for InputDropTargetData {
 
 pub const DEBOUNCE_INPUT_DECORATION_PERIOD: Duration = Duration::from_millis(10);
 pub const DEBOUNCE_AI_QUERY_PREDICTION_PERIOD: Duration = Duration::from_millis(250);
+const EMPTY_COMMAND_SUBMISSION_COOLDOWN: Duration = Duration::from_millis(500);
 pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_MAX_HEIGHT: f32 = 236.;
 pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_TOP_PADDING: f32 = 10.;
 pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_BOTTOM_PADDING: f32 = 8.;
@@ -1435,6 +1436,11 @@ enum DenyExecutionReason {
     /// Can't execute command because there's an active command in control of the pty.
     ExistingActiveCommand,
 
+    /// A command was already submitted for the current block, but the terminal model has not
+    /// advanced to the next block yet. Closes the window in which repeated Enter keypresses could
+    /// submit several commands into the same block.
+    CommandSubmissionPending,
+
     /// With the exception of shared sessions, we should only execute commands if they can be
     /// recorded in history.
     ///
@@ -1492,6 +1498,12 @@ pub struct Input {
     /// If true, will submit the command in the editor to the shell upon receiving the
     /// precmd message.
     has_pending_command: bool,
+    /// The block for which a shell command was most recently submitted. A different active block
+    /// ID means the shell has completed the prior command and is ready for another submission.
+    last_submitted_block_id: Option<BlockId>,
+    /// Empty commands finish fast enough to advance the active block between repeated Enter
+    /// events, so rate-limit them across block IDs.
+    last_empty_command_submission_at: Option<Instant>,
     last_word_insertion: LastWordInsertion,
 
     ai_controller: ModelHandle<BlocklistAIController>,
@@ -3144,6 +3156,8 @@ impl Input {
             debounce_input_background_tx,
             debounce_ai_query_prediction_tx,
             has_pending_command: false,
+            last_submitted_block_id: None,
+            last_empty_command_submission_at: None,
             last_word_insertion,
             decorations_future_handle: None,
             autosuggestions_abort_handle: None,
@@ -5702,6 +5716,8 @@ impl Input {
 
         if !model.block_list().is_bootstrapped() {
             CanExecuteCommand::No(DenyExecutionReason::NotBootstrapped)
+        } else if self.last_submitted_block_id.as_ref() == Some(active_block.id()) {
+            CanExecuteCommand::No(DenyExecutionReason::CommandSubmissionPending)
         } else if active_block.is_active_and_long_running()
             && !active_block.is_in_band_command_block()
         {
@@ -5851,6 +5867,15 @@ impl Input {
         source: CommandExecutionSource,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
+        if command.trim().is_empty()
+            && self
+                .last_empty_command_submission_at
+                .is_some_and(|at| at.elapsed() < EMPTY_COMMAND_SUBMISSION_COOLDOWN)
+        {
+            log::warn!("Ignored a rapid empty command submission");
+            return false;
+        }
+
         if let CanExecuteCommand::No(reason) = self.can_execute_command(ctx) {
             if reason.is_existing_active_command() {
                 const MAX_COMMAND_LENGTH: usize = 43;
@@ -6010,6 +6035,8 @@ impl Input {
                 });
             }
 
+            self.last_empty_command_submission_at =
+                command.trim().is_empty().then(Instant::now);
             self.start_block_and_write_command_to_pty(command, source, ctx);
             did_execute = true;
         } else {
@@ -6034,6 +6061,8 @@ impl Input {
         &mut self,
         ctx: &mut ViewContext<Self>,
     ) {
+        self.last_submitted_block_id = None;
+
         let Some(shared_session_input_state) = self.shared_session_input_state.as_mut() else {
             return;
         };
@@ -12933,6 +12962,11 @@ impl Input {
         ctx: &mut ViewContext<Self>,
     ) {
         start_trace!("command_execution:start");
+
+        // Record synchronously, before the PTY controller marks the block started; otherwise
+        // rapid Enter presses can submit several commands into the same block.
+        self.last_submitted_block_id =
+            Some(self.model.lock().block_list().active_block_id().clone());
 
         // Abort running completions since we're about to execute a command.
         if let Some(abort_handle) = self.completions_abort_handle.take() {

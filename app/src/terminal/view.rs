@@ -1580,6 +1580,22 @@ impl IndicatorPositionArg {
     }
 }
 
+/// Isolate an AI-requested command at the PTY boundary so shell state changes such as `set -x`,
+/// `cd`, exports, aliases, and traps do not leak into the persistent interactive shell. This is
+/// applied only when writing to the PTY, so command cards and history show the original command.
+fn isolate_ai_requested_command(command: &str, shell_type: Option<ShellType>) -> String {
+    match shell_type {
+        Some(ShellType::Fish) => {
+            let escaped = command.replace('\\', "\\\\").replace('\'', "\\'");
+            format!("command fish -c '{escaped}'")
+        }
+        // shortcut: single-line form for PowerShell (no bracketed paste); newlines inside the
+        // braces are still accepted by PowerShell as a continuation.
+        Some(ShellType::PowerShell) => format!("& {{ {command} }}"),
+        Some(ShellType::Bash | ShellType::Zsh) | None => format!("(\n{command}\n)"),
+    }
+}
+
 #[derive(Clone)]
 pub struct ExecuteAIRequestedCommandEvent {
     pub requested_command_id: AIAgentActionId,
@@ -6178,28 +6194,15 @@ impl TerminalView {
                         }
                     });
 
-                let shell_family = self.sessions.read(ctx, |sessions, _| {
+                let shell_type = self.sessions.read(ctx, |sessions, _| {
                     sessions
                         .get(session_id)
-                        .map(|session| session.shell_family())
+                        .map(|session| session.shell().shell_type())
                 });
-                // We special-case PowerShell multi-line commands b/c PowerShell does not support
-                // bracketed paste escape codes. Without those, multi-line commands have each line
-                // appear in a separate block. However, Agent Mode assumes the command will be in a
-                // single block. This is technically an issue with other shells without bracketed
-                // paste support, e.g. Bash 3.2, so this workaround is an incomplete solution. We
-                // wrap the PowerShell snipped in an immediately invoked script block.
-                let command = match shell_family {
-                    Some(ShellFamily::PowerShell) => {
-                        let command = command.trim();
-                        if command.contains('\n') {
-                            format!(". {{ {command} }}")
-                        } else {
-                            command.to_string()
-                        }
-                    }
-                    _ => command.clone(),
-                };
+                // Isolate the command in a subshell / script block at the PTY boundary. This also
+                // keeps multi-line PowerShell commands in one block, since PowerShell does not
+                // support bracketed paste and Agent Mode expects one block per action.
+                let command = isolate_ai_requested_command(command.trim(), shell_type);
 
                 let workflow_telem_metadata = associated_workflow.map(|workflow| {
                     let workflow_data = &workflow.model().data;
