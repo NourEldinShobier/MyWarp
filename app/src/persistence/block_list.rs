@@ -124,11 +124,34 @@ pub(super) fn upsert_ai_query(
     })?)
 }
 
+/// Bounds the `blocks` table before it is read at startup: drops blocks of panes that are no
+/// longer persisted, and, per pane, everything older than the newest
+/// [`MAX_TERMINAL_BLOCKS_TO_PERSIST_PER_SESSION`] blocks (including background blocks, which the
+/// write path does not count). Without this, a database that grew past the cap stalls startup.
+pub(super) fn prune_blocks(conn: &mut SqliteConnection) -> Result<(), Error> {
+    conn.transaction::<_, Error, _>(|conn| {
+        diesel::sql_query(
+            "DELETE FROM blocks WHERE pane_leaf_uuid NOT IN (SELECT uuid FROM terminal_panes)",
+        )
+        .execute(conn)?;
+        // A pane with fewer than the cap rows yields a NULL subquery, so nothing is deleted.
+        diesel::sql_query(format!(
+            "DELETE FROM blocks WHERE id < (SELECT b2.id FROM blocks b2              WHERE b2.pane_leaf_uuid = blocks.pane_leaf_uuid              ORDER BY b2.id DESC LIMIT 1 OFFSET {})",
+            MAX_TERMINAL_BLOCKS_TO_PERSIST_PER_SESSION - 1
+        ))
+        .execute(conn)?;
+        Ok(())
+    })
+}
+
 /// Returns the most recent [`MAX_BLOCK_COUNT_PER_SESSION`] block list items for each session. The
 /// items are in chronological order.
 pub(super) fn get_all_restored_blocks(
     conn: &mut SqliteConnection,
 ) -> Result<PersistedBlocks, diesel::result::Error> {
+    if let Err(err) = prune_blocks(conn) {
+        log::warn!("Failed to prune persisted blocks: {err:#}");
+    }
     let terminal_sessions = schema::terminal_panes::table
         .select(model::TerminalSession::as_select())
         .load::<model::TerminalSession>(conn)?;
