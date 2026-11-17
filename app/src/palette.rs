@@ -5,7 +5,7 @@ pub enum PaletteMode {
     Command,
     Navigation,
     LaunchConfig,
-    ZapDrive,
+    WarpDrive,
     Files,
     Conversations,
 }

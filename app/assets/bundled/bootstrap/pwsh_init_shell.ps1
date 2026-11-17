@@ -1,6 +1,6 @@
 ﻿# Prevent history from being written to file, among other interactive features.
 Remove-Module -Name PSReadline -ErrorAction Ignore
-$diagLog = "$env:TEMP\zap_init_diag.log"
+$diagLog = "$env:TEMP\warp_init_diag.log"
 try {
     Add-Content -Path $diagLog -Value "[$(Get-Date -Format 'HH:mm:ss.fff')] START ps=$($PSVersionTable.PSVersion) edition=$PSEdition interactive=$([Environment]::UserInteractive) host=$($host.Name) pid=$PID"
 

@@ -47,7 +47,7 @@ jobs:
           PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           USER: ${{ secrets.DEPLOY_USER }}
           HOST: ${{ secrets.DEPLOY_HOST }}
-          # DEPLOY_PATH = 站点 index 目录,例如 /opt/1panel/www/sites/zap.zerx.dev/index
+          # DEPLOY_PATH = 站点 index 目录,例如 /opt/1panel/www/sites/warp.zerx.dev/index
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           # 在站点父目录(index 的上一级)准备暂存区与脚本目录

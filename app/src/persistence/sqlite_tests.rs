@@ -392,8 +392,8 @@ fn test_path_encode_decode() {
 
 #[cfg(target_os = "macos")]
 #[test]
-fn test_migrate_zap_app_group_sqlite_copies_newer_legacy_files() {
-    use super::migrate_zap_app_group_sqlite_if_needed;
+fn test_migrate_warp_app_group_sqlite_copies_newer_legacy_files() {
+    use super::migrate_warp_app_group_sqlite_if_needed;
 
     let tempdir = tempfile::tempdir().expect("tempdir should be created");
     let legacy_dir = tempdir.path().join("legacy");
@@ -412,7 +412,7 @@ fn test_migrate_zap_app_group_sqlite_copies_newer_legacy_files() {
     fs::write(legacy_db.with_extension("sqlite-shm"), "legacy-shm")
         .expect("legacy shm should be written");
 
-    migrate_zap_app_group_sqlite_if_needed(&target_db, &legacy_dir)
+    migrate_warp_app_group_sqlite_if_needed(&target_db, &legacy_dir)
         .expect("migration should succeed");
 
     assert_eq!(fs::read_to_string(&target_db).unwrap(), "legacy-db");
@@ -425,14 +425,14 @@ fn test_migrate_zap_app_group_sqlite_copies_newer_legacy_files() {
         "legacy-shm"
     );
     assert!(state_dir
-        .join(".zap-app-group-sqlite-migrated")
+        .join(".warp-app-group-sqlite-migrated")
         .exists());
 }
 
 #[cfg(target_os = "macos")]
 #[test]
-fn test_migrate_zap_app_group_sqlite_copies_when_legacy_wal_is_newer() {
-    use super::migrate_zap_app_group_sqlite_if_needed;
+fn test_migrate_warp_app_group_sqlite_copies_when_legacy_wal_is_newer() {
+    use super::migrate_warp_app_group_sqlite_if_needed;
 
     let tempdir = tempfile::tempdir().expect("tempdir should be created");
     let legacy_dir = tempdir.path().join("legacy");
@@ -449,7 +449,7 @@ fn test_migrate_zap_app_group_sqlite_copies_when_legacy_wal_is_newer() {
     fs::write(legacy_db.with_extension("sqlite-wal"), "legacy-wal")
         .expect("legacy wal should be written");
 
-    migrate_zap_app_group_sqlite_if_needed(&target_db, &legacy_dir)
+    migrate_warp_app_group_sqlite_if_needed(&target_db, &legacy_dir)
         .expect("migration should succeed");
 
     assert_eq!(fs::read_to_string(&target_db).unwrap(), "legacy-db");
@@ -461,8 +461,8 @@ fn test_migrate_zap_app_group_sqlite_copies_when_legacy_wal_is_newer() {
 
 #[cfg(target_os = "macos")]
 #[test]
-fn test_migrate_zap_app_group_sqlite_marker_skips_copy() {
-    use super::migrate_zap_app_group_sqlite_if_needed;
+fn test_migrate_warp_app_group_sqlite_marker_skips_copy() {
+    use super::migrate_warp_app_group_sqlite_if_needed;
 
     let tempdir = tempfile::tempdir().expect("tempdir should be created");
     let legacy_dir = tempdir.path().join("legacy");
@@ -474,12 +474,12 @@ fn test_migrate_zap_app_group_sqlite_marker_skips_copy() {
     fs::write(legacy_dir.join("warp.sqlite"), "legacy-db").expect("legacy db should be written");
     fs::write(&target_db, "target-db").expect("target db should be written");
     fs::write(
-        state_dir.join(".zap-app-group-sqlite-migrated"),
+        state_dir.join(".warp-app-group-sqlite-migrated"),
         "migrated\n",
     )
     .expect("marker should be written");
 
-    migrate_zap_app_group_sqlite_if_needed(&target_db, &legacy_dir)
+    migrate_warp_app_group_sqlite_if_needed(&target_db, &legacy_dir)
         .expect("migration should succeed");
 
     assert_eq!(fs::read_to_string(&target_db).unwrap(), "target-db");

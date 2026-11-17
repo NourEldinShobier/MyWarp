@@ -267,9 +267,9 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         context.to_owned(),
     )]);
 
-    // Add command palette entry for toggling between Zap and Classic input modes
+    // Add command palette entry for toggling between Warp and Classic input modes
     app.register_fixed_bindings(vec![FixedBinding::empty(
-        "Toggle Input Mode (Zap/Classic)".to_string(),
+        "Toggle Input Mode (Warp/Classic)".to_string(),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::ToggleInputMode,
         )),
@@ -293,7 +293,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         ),
     );
 
-    if !FeatureFlag::ZapNewSettingsModes.is_enabled() {
+    if !FeatureFlag::WarpNewSettingsModes.is_enabled() {
         toggle_binding_pairs.push(
             ToggleSettingActionPair::custom(
                 SettingActionPairDescriptions::new(
@@ -547,7 +547,7 @@ pub struct AppearanceSettingsPageView {
     header_toolbar_inline_editor: ViewHandle<HeaderToolbarInlineEditor>,
 
     /// The context chip renderers based on the most recently
-    /// selected Zap prompt configuration.
+    /// selected Warp prompt configuration.
     context_chips: Vec<ContextChipRenderer>,
 
     /// The information we need to render the PS1 as a grid when we're
@@ -1565,7 +1565,7 @@ impl AppearanceSettingsPageView {
         let tab_settings = TabSettings::as_ref(ctx);
         let mut tab_settings_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> =
             vec![Box::new(TabIndicatorWidget::default())];
-        if !FeatureFlag::ZapNewSettingsModes.is_enabled() {
+        if !FeatureFlag::WarpNewSettingsModes.is_enabled() {
             tab_settings_widgets.push(Box::new(CodeReviewButtonWidget::default()));
         }
         if FeatureFlag::FullScreenZenMode.is_enabled()
@@ -1793,7 +1793,7 @@ impl AppearanceSettingsPageView {
             AppIcon::Original => "Original",
             AppIcon::Starburst => "Starburst",
             AppIcon::Sticker => "Sticker",
-            AppIcon::WarpOne => "Zap 1",
+            AppIcon::WarpOne => "Warp 1",
         }
     }
 
@@ -3873,7 +3873,7 @@ impl SettingsWidget for ToolsPanelStateScopeWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "left tools panel open closed across tabs file tree project explorer global search zap drive conversation list"
+        "left tools panel open closed across tabs file tree project explorer global search warp drive conversation list"
     }
 
     fn render(

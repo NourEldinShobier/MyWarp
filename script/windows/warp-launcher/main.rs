@@ -1,12 +1,12 @@
-//! Windows shell launcher: `zap.exe [--tab] [path]` opens Zap via its URL scheme.
-//! Compiled by bundle.ps1 and installed as `bin\zap.exe` and `bin\warp.exe`.
+//! Windows shell launcher: `warp.exe [--tab] [path]` opens Warp via its URL scheme.
+//! Compiled by bundle.ps1 and installed as `bin\warp.exe` and `bin\warp.exe`.
 #![windows_subsystem = "windows"]
 
 use std::path::PathBuf;
 use std::process::Command;
 
-const APP_EXE: &str = "zap-oss.exe";
-const URL_SCHEME: &str = "zap";
+const APP_EXE: &str = "warp-oss.exe";
+const URL_SCHEME: &str = "warp";
 
 fn percent_encode(s: &str) -> String {
     let mut out = String::new();

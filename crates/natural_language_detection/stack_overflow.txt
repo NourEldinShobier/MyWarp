@@ -2867,7 +2867,7 @@ keyerror
 rbenv
 timeline
 zk
-zapier
+warpier
 steam
 cognos
 tomcat9

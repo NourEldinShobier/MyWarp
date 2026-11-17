@@ -154,10 +154,10 @@ mod tests {
 
     #[test]
     fn test_gist_entry_deserialization() {
-        let json = r#"{"id":"abc123","description":"ZAP_CONFIG"}"#;
+        let json = r#"{"id":"abc123","description":"WARP_CONFIG"}"#;
         let entry: GistEntry = serde_json::from_str(json).unwrap();
         assert_eq!(entry.id, "abc123");
-        assert_eq!(entry.description, Some("ZAP_CONFIG".to_string()));
+        assert_eq!(entry.description, Some("WARP_CONFIG".to_string()));
     }
 
     #[test]

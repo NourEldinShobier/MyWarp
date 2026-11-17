@@ -725,7 +725,7 @@ pub enum FeaturesPageAction {
     ToggleShowAutosuggestionIgnoreButton,
     ToggleAtContextMenuInTerminalMode,
     ToggleSlashCommandsInTerminalMode,
-    // Zap:`ToggleOutlineCodebaseSymbolsForAtContextMenu` 随 outline / RAG 下线删除。
+    // Warp:`ToggleOutlineCodebaseSymbolsForAtContextMenu` 随 outline / RAG 下线删除。
     ToggleAutoOpenCodeReviewPane,
     ToggleShowTerminalInputMessageLine,
     ToggleAgentInAppNotifications,
@@ -1207,7 +1207,7 @@ impl FeaturesPageAction {
                         .value(),
                 ),
             },
-            // Zap:ToggleOutlineCodebaseSymbolsForAtContextMenu 已下线,
+            // Warp:ToggleOutlineCodebaseSymbolsForAtContextMenu 已下线,
             // telemetry 分支一并删除。
             Self::MakeWarpDefaultTerminal => TelemetryEvent::FeaturesPageAction {
                 action: "MakeWarpDefaultTerminal".to_string(),
@@ -1950,7 +1950,7 @@ impl TypedActionView for FeaturesPageView {
                         .toggle_and_save_value(ctx));
                 });
             }
-            // Zap:`ToggleOutlineCodebaseSymbolsForAtContextMenu` action 随 outline
+            // Warp:`ToggleOutlineCodebaseSymbolsForAtContextMenu` action 随 outline
             // 下线推退删除。
             ToggleAutoOpenCodeReviewPane => {
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -2546,7 +2546,7 @@ impl FeaturesPageView {
 
         #[cfg(feature = "local_fs")]
         {
-            if !FeatureFlag::ZapNewSettingsModes.is_enabled() {
+            if !FeatureFlag::WarpNewSettingsModes.is_enabled() {
                 let external_editor_settings =
                     crate::util::file::external_editor::EditorSettings::as_ref(ctx);
                 if external_editor_settings
@@ -2581,7 +2581,7 @@ impl FeaturesPageView {
         }
 
         if FeatureFlag::AutoOpenCodeReviewPane.is_enabled()
-            && !FeatureFlag::ZapNewSettingsModes.is_enabled()
+            && !FeatureFlag::WarpNewSettingsModes.is_enabled()
         {
             general_widgets.push(Box::new(AutoOpenCodeReviewPaneWidget::default()));
         }

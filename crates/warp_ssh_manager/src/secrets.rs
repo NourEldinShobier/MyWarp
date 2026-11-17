@@ -7,7 +7,7 @@
 use thiserror::Error;
 use zeroize::Zeroizing;
 
-const SERVICE: &str = "zap.ssh";
+const SERVICE: &str = "warp.ssh";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SecretKind {

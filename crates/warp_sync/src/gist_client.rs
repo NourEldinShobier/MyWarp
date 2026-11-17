@@ -9,8 +9,8 @@ use serde_json::json;
 use std::time::Duration;
 use thiserror::Error;
 
-const GIST_DESCRIPTION: &str = "ZAP_CONFIG";
-const GIST_FILENAME: &str = "zap_config.json";
+const GIST_DESCRIPTION: &str = "WARP_CONFIG";
+const GIST_FILENAME: &str = "warp_config.json";
 /// HTTP 整体请求超时（含 connect + read），避免网络挂起让 UI 永远卡在 Syncing
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -36,7 +36,7 @@ pub trait GistOps: Send + Sync {
     /// 验证 Token 是否有效，返回用户名
     fn validate_token(&self, platform: SyncPlatform, token: String) -> impl std::future::Future<Output = Result<String, GistClientError>> + Send;
 
-    /// 查找 description 为 ZAP_CONFIG 的 Gist
+    /// 查找 description 为 WARP_CONFIG 的 Gist
     fn find_gist(&self, platform: SyncPlatform, token: String) -> impl std::future::Future<Output = Result<Option<String>, GistClientError>> + Send;
 
     /// 创建新 Gist
@@ -60,7 +60,7 @@ impl GistClient {
     /// 也不要静默回退到无 user-agent 的 Client::default() — GitHub 强制要求 UA。
     pub fn new() -> Self {
         let client = Client::builder()
-            .user_agent("Zap-Terminal")
+            .user_agent("Warp-Terminal")
             .timeout(REQUEST_TIMEOUT)
             .connect_timeout(CONNECT_TIMEOUT)
             .build()
@@ -110,7 +110,7 @@ impl GistClient {
         Ok(login.to_string())
     }
 
-    /// 查找 description 为 ZAP_CONFIG 的 Gist，返回其 ID
+    /// 查找 description 为 WARP_CONFIG 的 Gist，返回其 ID
     pub async fn find_gist(
         &self,
         platform: SyncPlatform,

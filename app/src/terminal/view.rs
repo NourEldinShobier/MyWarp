@@ -801,16 +801,16 @@ impl NotificationsTrigger {
     pub fn discovery_banner_copy(&self) -> &'static str {
         match self {
             NotificationsTrigger::LongRunningCommand(..) => {
-                "Zap can notify you when long-running commands finish."
+                "Warp can notify you when long-running commands finish."
             }
             NotificationsTrigger::AgentTaskCompleted(..) => {
-                "Zap can notify you when an agent finishes responding."
+                "Warp can notify you when an agent finishes responding."
             }
             NotificationsTrigger::NeedsAttention => {
-                "Zap can notify you when a command or agent needs your attention."
+                "Warp can notify you when a command or agent needs your attention."
             }
             NotificationsTrigger::PasswordPrompt => {
-                "Zap can notify you when you're prompted to enter a password."
+                "Warp can notify you when you're prompted to enter a password."
             }
         }
     }
@@ -1634,7 +1634,7 @@ pub enum Event {
     OpenWorkflowModalWithWorkflowObject(SyncId),
     // Tell the pane group to open the workflow modal with an unsaved workflow.
     OpenWorkflowModalWithTemporary(Box<Workflow>),
-    ZapDriveObjectInPane(ObjectUid),
+    WarpDriveObjectInPane(ObjectUid),
     OpenSuggestedAgentModeWorkflowModal {
         workflow_and_id: SuggestedAgentModeWorkflowAndId,
     },
@@ -1683,7 +1683,7 @@ pub enum Event {
     BlockStarted {
         is_for_in_band_command: bool,
     },
-    /// Tell the pane group to open a file within Zap.
+    /// Tell the pane group to open a file within Warp.
     OpenFileInWarp {
         path: PathBuf,
         /// The session that the file belongs to.
@@ -1816,7 +1816,7 @@ pub enum Event {
         target: FileTarget,
         line_col: Option<LineAndColumnArg>,
     },
-    /// Zap:缂佸牏顏柌?Ctrl/Cmd+閻愮懓鍤潻婊咁伂 SSH 娴兼俺鐦芥潏鎾冲毉娑擃厾娈戦弬鍥︽鐠侯垰绶為弮璺哄絺閸戞亽鈧?    /// 鐠?buffer-sync 閸楀繗顔呴崷銊х椽鏉堟垵娅掗柌灞惧ⅵ瀵偓鏉╂粎顏弬鍥︽,閼板奔绗夐弰顖涙拱閸?`OpenFileWithTarget`閵?    #[cfg(all(feature = "local_tty", feature = "local_fs"))]
+    /// Warp:缂佸牏顏柌?Ctrl/Cmd+閻愮懓鍤潻婊咁伂 SSH 娴兼俺鐦芥潏鎾冲毉娑擃厾娈戦弬鍥︽鐠侯垰绶為弮璺哄絺閸戞亽鈧?    /// 鐠?buffer-sync 閸楀繗顔呴崷銊х椽鏉堟垵娅掗柌灞惧ⅵ瀵偓鏉╂粎顏弬鍥︽,閼板奔绗夐弰顖涙拱閸?`OpenFileWithTarget`閵?    #[cfg(all(feature = "local_tty", feature = "local_fs"))]
     OpenRemoteFileFromTerminal {
         remote_path: crate::code::buffer_location::RemotePath,
         line_col: Option<LineAndColumnArg>,
@@ -1874,7 +1874,7 @@ pub enum LongRunningCommandAgentInteractionState {
 #[derive(Clone, Copy, Debug)]
 pub enum LeftPanelTargetView {
     FileTree,
-    ZapDrive,
+    WarpDrive,
 }
 
 #[derive(Clone)]
@@ -2256,7 +2256,7 @@ impl Default for TerminalViewStateChange {
 }
 
 /// Whether or not this is the active terminal session. The active session for a pane group
-/// is the one used for executing workflows, Zap AI suggestions, etc.
+/// is the one used for executing workflows, Warp AI suggestions, etc.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveSessionState {
     Active,
@@ -2938,7 +2938,7 @@ pub struct TerminalView {
     control_master_error_banner_state: ControlMasterErrorBannerState,
 
     /// Banner to show if we detect a configuration in the user's rc files that
-    /// is incompatible with Zap.
+    /// is incompatible with Warp.
     incompatible_configuration_banner: ViewHandle<Banner<TerminalAction>>,
     is_incompatible_configuration_banner_open: bool,
 
@@ -4046,7 +4046,7 @@ impl TerminalView {
             &ai_action_model.as_ref(ctx).shell_command_executor(ctx),
             Self::handle_shell_command_executor_event,
         );
-        // Zap BYOP:鐠併垽妲?suggest_prompt 瀹搞儱鍙块惃?chip event,閹跺﹥膩閸ㄥ瀵岄崝銊ョ紦鐠侇喚娈?prompt
+        // Warp BYOP:鐠併垽妲?suggest_prompt 瀹搞儱鍙块惃?chip event,閹跺﹥膩閸ㄥ瀵岄崝銊ョ紦鐠侇喚娈?prompt
         // 濞撳弶鐓嬮幋?input 娑撳﹥鏌熼惃?chip閵嗗倸甯悧?emit 鐞?PromptSuggestionsViaMAA cargo feature
         // gate(`action_model/execute/suggest_prompt.rs:56`),OSS 姒涙顓婚弮鐘辨眽鐠併垽妲?閳?chip
         // 濮樻瓕绻欐稉宥嗘▔缁€?閳?oneshot channel 濮樺憡瀵?閳?conversation 閸椻剝顒撮妴鍌氬嚒閸樼粯甯€ emit gate,
@@ -4955,7 +4955,7 @@ impl TerminalView {
     /// Returns whether this terminal view should subscribe to git status
     /// updates. We subscribe when:
     /// 1. Agent mode is active and its chip list includes `GitDiffStats`, or
-    /// 2. Terminal mode with the Zap prompt enabled and the git stats chip
+    /// 2. Terminal mode with the Warp prompt enabled and the git stats chip
     ///    configured.
     #[cfg(feature = "local_fs")]
     fn should_subscribe_to_git_status(&self, ctx: &AppContext) -> bool {
@@ -4967,7 +4967,7 @@ impl TerminalView {
                 .contains(&ContextChipKind::GitDiffStats);
         }
 
-        // Terminal prompt path: the Zap prompt is active when honor_ps1 is
+        // Terminal prompt path: the Warp prompt is active when honor_ps1 is
         // off, or when UDI overrides PS1. GitDiffStats must also be in the
         // configured chip list.
         let is_using_warp_prompt = !*SessionSettings::as_ref(ctx).honor_ps1
@@ -8955,7 +8955,7 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            WarpifySuccessBlockEvent::ZapifySettings => {
+            WarpifySuccessBlockEvent::WarpifySettings => {
                 ctx.emit(Event::OpenSettings(SettingsSection::Warpify));
             }
         }
@@ -9020,11 +9020,11 @@ impl TerminalView {
 
         let a11y_message = match &warpify_keybinding {
             Some(keystroke) => format!(
-                "You can press {} to Warpify this {} for more Zap features.",
+                "You can press {} to Warpify this {} for more Warp features.",
                 keystroke.displayed(),
                 lowercase_title
             ),
-            None => format!("You can Warpify this {lowercase_title} for more Zap features."),
+            None => format!("You can Warpify this {lowercase_title} for more Warp features."),
         };
 
         model
@@ -9187,7 +9187,7 @@ impl TerminalView {
 
         let a11y_content = AccessibilityContent::new(
             banner_title,
-            "Make sure you have enabled access for Zap notifications in System Preferences.",
+            "Make sure you have enabled access for Warp notifications in System Preferences.",
             WarpA11yRole::TextRole,
         );
         ctx.emit_a11y_content(a11y_content);
@@ -9263,7 +9263,7 @@ impl TerminalView {
         let should_start_new_conversation = suggestion.should_start_new_conversation;
         let conversation_id = banner_state.conversation_id;
         let trigger_block_id = trigger.as_ref().and_then(|t| t.block_id());
-        // Zap BYOP:閸忓娈?byop_action_id + prompt,閻劋绨?accept 閺堫偄鐔柅姘辩叀 executor
+        // Warp BYOP:閸忓娈?byop_action_id + prompt,閻劋绨?accept 閺堫偄鐔柅姘辩叀 executor
         let byop_banner_for_completion = banner_state
             .byop_action_id
             .is_some()
@@ -9908,7 +9908,7 @@ impl TerminalView {
         reset_focus
     }
 
-    /// Recomputes the chip values for the Zap prompt (i.e. _not_ PS1).
+    /// Recomputes the chip values for the Warp prompt (i.e. _not_ PS1).
     fn refresh_warp_prompt(&mut self, ctx: &mut ViewContext<Self>) {
         // Ask the per-repo sub-model to re-fetch metadata so the chip values
         // reflect the latest git state (branch, diff stats, etc.).
@@ -10758,7 +10758,7 @@ impl TerminalView {
                         );
 
                         // On dogfood only, we're interested in the block commands, durations,
-                        // and exit codes to trial Zap Analytics.
+                        // and exit codes to trial Warp Analytics.
                         if ChannelState::channel().is_dogfood() {
                             send_telemetry_from_ctx!(
                                 TelemetryEvent::BlockCompletedOnDogfoodOnly {
@@ -11594,7 +11594,7 @@ impl TerminalView {
                 me.remove_ssh_remote_server_choice_block(session_id, ctx);
                 ctx.emit(Event::RemoteServerSkipRequested { session_id });
             }
-            SshRemoteServerChoiceViewEvent::ZapifySettings => {
+            SshRemoteServerChoiceViewEvent::WarpifySettings => {
                 ctx.emit(Event::OpenSettings(SettingsSection::Warpify));
             }
         });
@@ -13380,7 +13380,7 @@ impl TerminalView {
 
         // Desktop notifications for CLI agents use the user's notification settings
         // directly. CLI agent notifications are explicit agent lifecycle events,
-        // so they should still notify when Zap is focused.
+        // so they should still notify when Warp is focused.
         if matches!(status, CLIAgentSessionStatus::InProgress) {
             return;
         }
@@ -13578,7 +13578,7 @@ impl TerminalView {
         let should_show_onboarding = FeatureFlag::AgentOnboarding.is_enabled()
             && !is_onboarded
             && !is_anonymous_or_logged_out;
-        let is_launch_modal_open = OneTimeModalModel::as_ref(ctx).is_zap_launch_modal_open();
+        let is_launch_modal_open = OneTimeModalModel::as_ref(ctx).is_warp_launch_modal_open();
 
         let has_plugin_instructions_block = self.rich_content_views.iter().any(|rc| {
             matches!(
@@ -13616,7 +13616,7 @@ impl TerminalView {
 
         // Now that the session is bootstrapped, update any restored AI blocks that were
         // created before bootstrapping with the shell launch data. This enables file link
-        // detection and the "Open in Zap" button on code blocks in restored conversations.
+        // detection and the "Open in Warp" button on code blocks in restored conversations.
         if let Some(shell_launch_data) = self.active_session.as_ref(ctx).shell_launch_data(ctx) {
             let ai_block_handles: Vec<_> = self
                 .rich_content_views
@@ -14814,7 +14814,7 @@ impl TerminalView {
         self.update_scroll_position_locking(ScrollPositionUpdate::AfterEnd, ctx);
     }
 
-    /// Zap BYOP:濡€崇€锋稉璇插З鐠?`suggest_prompt` 瀹搞儱鍙块弮?executor emit 濮濄倓绨ㄦ禒鑸垫儭鐢?    /// prompt + label + action_id閵?    ///
+    /// Warp BYOP:濡€崇€锋稉璇插З鐠?`suggest_prompt` 瀹搞儱鍙块弮?executor emit 濮濄倓绨ㄦ禒鑸垫儭鐢?    /// prompt + label + action_id閵?    ///
     /// **鐠佹崘顓哥拠顓濈疅**:`suggest_prompt` 閺?fire-and-forget(鐎靛綊缍?opencode agentic 瀹搞儱鍙跨悰灞艰礋)
     /// 閳ユ柡鈧?chip 娑撯偓閺勫墽銇氱亸?*缁斿宓?* complete oneshot(娴?Accepted{query: prompt} 閸犲倸娲栧Ο鈥崇€?,
     /// 娑撳秶鐡戦悽銊﹀煕閻愮懓鍤妴鍌濈箹閺?
@@ -15485,7 +15485,7 @@ impl TerminalView {
     }
 
     /// Shared logic for sending a desktop notification (or showing a discovery banner)
-    /// for any agent status change (both Zap's agent and any CLI agent).
+    /// for any agent status change (both Warp's agent and any CLI agent).
     fn send_agent_desktop_notification_or_show_banner(
         &mut self,
         trigger: NotificationsTrigger,
@@ -16240,7 +16240,7 @@ impl TerminalView {
                                         .with_on_select_action(TerminalAction::OpenFileInWarp(path))
                                         .into_item(),
                                 );
-                                // Because the default for cmd-click is to open in Zap, we also
+                                // Because the default for cmd-click is to open in Warp, we also
                                 // have an open-in-editor option.
                                 items.push(
                                     MenuItemFields::new(crate::t!("menu-block-open-in-editor"))
@@ -16361,7 +16361,7 @@ impl TerminalView {
                 let is_copy_both_disabled =
                     is_copy_commands_disabled && tail_block.output_to_string().trim().is_empty();
 
-                // Zap:閸掔娀娅?"Share block..." / "Share session..." 閸忋儱褰?娴滄垹顏笟婵婄)
+                // Warp:閸掔娀娅?"Share block..." / "Share session..." 閸忋儱褰?娴滄垹顏笟婵婄)
                 let _ = is_share_disabled;
 
                 let mut items = vec![
@@ -16547,7 +16547,7 @@ impl TerminalView {
             ) => {
                 // If selection is empty, only show non-block related options
                 let items: Vec<MenuItem<TerminalAction>> = Vec::new();
-                // Zap:閸掔娀娅?session_sharing_context_menu_items(娴滄垹顏?shared session 閸忋儱褰?
+                // Warp:閸掔娀娅?session_sharing_context_menu_items(娴滄垹顏?shared session 閸忋儱褰?
                 items
             }
             _ => vec![],
@@ -16944,9 +16944,9 @@ impl TerminalView {
                 .into_item(),
         );
 
-        // Zap:閸掔娀娅?session_sharing_context_menu_items(娴滄垹顏?shared session 閸忋儱褰?
+        // Warp:閸掔娀娅?session_sharing_context_menu_items(娴滄垹顏?shared session 閸忋儱褰?
 
-        // Section 2: AI Command Search, Ask Zap AI
+        // Section 2: AI Command Search, Ask Warp AI
         items.extend([
             MenuItem::Separator,
             MenuItemFields::new(crate::t!("menu-input-command-search"))
@@ -17178,7 +17178,7 @@ impl TerminalView {
             }
         }
 
-        // Zap:閸掔娀娅?session_sharing_context_menu_items(娴滄垹顏?shared session 閸忋儱褰?
+        // Warp:閸掔娀娅?session_sharing_context_menu_items(娴滄垹顏?shared session 閸忋儱褰?
         let current_shell = model.shell_launch_state().available_shell();
         let mut pane_context_menu_items = self.pane_context_menu_items(current_shell, ctx);
         if !menu_items.is_empty() && !pane_context_menu_items.is_empty() {
@@ -17443,7 +17443,7 @@ impl TerminalView {
         );
         items.push(MenuItem::Separator);
 
-        // Remote conversation sharing was removed in Zap; share-conversation menu item omitted.
+        // Remote conversation sharing was removed in Warp; share-conversation menu item omitted.
         let _ = ai_conversation_id;
 
         items.push(
@@ -18425,7 +18425,7 @@ impl TerminalView {
         }
     }
 
-    /// Zap:閼汇儱缍嬮崜宥嗘た閸?block 閹碘偓鐏炵偘绱扮拠婵囨Ц remote-server 娴兼俺鐦?鏉╂柨娲栭崗?`HostId`閵?    ///
+    /// Warp:閼汇儱缍嬮崜宥嗘た閸?block 閹碘偓鐏炵偘绱扮拠婵囨Ц remote-server 娴兼俺鐦?鏉╂柨娲栭崗?`HostId`閵?    ///
     /// 閻劋绨崷銊х矒缁旑垶鍣?Ctrl/Cmd+閻愮懓鍤弬鍥︽鐠侯垰绶為弮?閸掋倖鏌囨惔鏂跨秼鐠х増婀伴崷鎷岀箷閺勵垵绻欑粩?buffer-sync
     #[cfg(all(feature = "local_tty", feature = "local_fs"))]
     fn active_session_remote_host_id(&self, ctx: &AppContext) -> Option<warp_core::HostId> {
@@ -18497,7 +18497,7 @@ impl TerminalView {
     ) {
         ctx.notify();
 
-        // Zap:鏉╂粎顏?SSH 娴兼俺鐦界挧?buffer-sync 閸楀繗顔呴幍鎾崇磻鏉╂粎顏弬鍥︽閵?        #[cfg(all(feature = "local_tty", feature = "local_fs"))]
+        // Warp:鏉╂粎顏?SSH 娴兼俺鐦界挧?buffer-sync 閸楀繗顔呴幍鎾崇磻鏉╂粎顏弬鍥︽閵?        #[cfg(all(feature = "local_tty", feature = "local_fs"))]
         if let Some(host_id) = self.active_session_remote_host_id(ctx) {
             // 鏉╂粎顏惄顔肩秿閻愮懓鍤?娑撳秴婀紓鏍帆閸ｃ劑鍣烽幍鎾崇磻,閺€閫涜礋閸︺劏顕氭潻婊咁伂娴兼俺鐦介柌?`cd` 鏉╂稑骞撻妴?            #[cfg(not(target_family = "wasm"))]
             if let Some(session_id) = self.active_block_session_id() {
@@ -18535,7 +18535,7 @@ impl TerminalView {
     ) {
         ctx.notify();
 
-        // Zap:鏉╂粎顏?SSH 娴兼俺鐦界挧?buffer-sync 閸楀繗顔呴幍鎾崇磻鏉╂粎顏弬鍥︽閵?        // 鏉╂粎顏弬鍥︽缂佺喍绔撮崷銊ュ敶瀹撳奔鍞惍浣虹椽鏉堟垵娅掗幍鎾崇磻,韫囩晫鏆?`target`(婢舵牠鍎寸紓鏍帆閸ｃ劍妫ゅ▔鏇☆問闂傤喛绻欑粩顖涙瀮娴?閵?        #[cfg(all(feature = "local_tty", feature = "local_fs"))]
+        // Warp:鏉╂粎顏?SSH 娴兼俺鐦界挧?buffer-sync 閸楀繗顔呴幍鎾崇磻鏉╂粎顏弬鍥︽閵?        // 鏉╂粎顏弬鍥︽缂佺喍绔撮崷銊ュ敶瀹撳奔鍞惍浣虹椽鏉堟垵娅掗幍鎾崇磻,韫囩晫鏆?`target`(婢舵牠鍎寸紓鏍帆閸ｃ劍妫ゅ▔鏇☆問闂傤喛绻欑粩顖涙瀮娴?閵?        #[cfg(all(feature = "local_tty", feature = "local_fs"))]
         if let Some(host_id) = self.active_session_remote_host_id(ctx) {
             // 鏉╂粎顏惄顔肩秿閻愮懓鍤?娑撳秴婀紓鏍帆閸ｃ劑鍣烽幍鎾崇磻,閺€閫涜礋閸︺劏顕氭潻婊咁伂娴兼俺鐦介柌?`cd` 鏉╂稑骞撻妴?            #[cfg(not(target_family = "wasm"))]
             if let Some(session_id) = self.active_block_session_id() {
@@ -18620,7 +18620,7 @@ impl TerminalView {
         self.paste(true, ctx);
     }
 
-    /// Tell the pane group to open a file within Zap.
+    /// Tell the pane group to open a file within Warp.
     fn open_file_in_warp(&mut self, path: PathBuf, ctx: &mut ViewContext<Self>) {
         if let Some(session) = self
             .active_block_session_id()
@@ -20350,7 +20350,7 @@ impl TerminalView {
             }
             AIBlockEvent::OpenCitation(citation) => match citation {
                 AIAgentCitation::WarpDriveObject { uid } => {
-                    ctx.emit(Event::ZapDriveObjectInPane(uid.clone()));
+                    ctx.emit(Event::WarpDriveObjectInPane(uid.clone()));
                 }
                 AIAgentCitation::WarpDocumentation { path: _ } => {}
                 AIAgentCitation::WebPage { url } => {
@@ -20362,7 +20362,7 @@ impl TerminalView {
             }
             AIBlockEvent::OpenWorkflow { sync_id } => {
                 if let Some(object) = ObjectStoreModel::as_ref(ctx).get_workflow(sync_id) {
-                    ctx.emit(Event::ZapDriveObjectInPane(object.uid()));
+                    ctx.emit(Event::WarpDriveObjectInPane(object.uid()));
                 }
             }
             AIBlockEvent::OpenSuggestedAgentModeWorkflowModal { workflow_and_id } => {
@@ -22672,7 +22672,7 @@ impl TerminalView {
                     self.update_incompatible_configuration_banner(session.shell().plugins(), ctx)
                 }
 
-                // honor_ps1 affects whether the Zap prompt is active, which
+                // honor_ps1 affects whether the Warp prompt is active, which
                 // determines if we need git status updates.
                 self.update_git_status_subscription(ctx);
             }
@@ -23358,9 +23358,9 @@ impl TerminalView {
         let render_context = self.get_terminal_view_render_context(model, app);
 
         let enforce_minimum_contrast = *FontSettings::as_ref(app).enforce_minimum_contrast;
-        // Zap:alt-screen 濞撳弶鐓?cli subagent 濞搭喚鐛ラ惃鍕灲鐎规矮绮犻崢?`is_agent_in_control()`
+        // Warp:alt-screen 濞撳弶鐓?cli subagent 濞搭喚鐛ラ惃鍕灲鐎规矮绮犻崢?`is_agent_in_control()`
         // 閺€鎯ь啍閸?`is_agent_in_control_or_tagged_in()`閵嗗倸甯弶銉ф畱閸掋倕鐣鹃崣顏団偓鍐 handoff 鐠侯垰绶?
-        // (agent 閹疯儻铔?LRC 閹貉冨煑閺?,濠曞繑甯€娴滃棛鏁ら幋铚傚瘜閸?tag-in 鐠侯垰绶?`SetInputModeAgent` 閳?        // `tag_in_agent_for_user_long_running_command`)閵嗗倸鎮楅懓鍛Ц Zap BYOP 闁炬崘鐭炬稉?        // 濞搭喚鐛ラ惃鍕瘜鐟曚礁鍙嗛崣?controller `send_request_input` 濡偓濞?tagged-in 閳?濞夈劌鍙?
+        // (agent 閹疯儻铔?LRC 閹貉冨煑閺?,濠曞繑甯€娴滃棛鏁ら幋铚傚瘜閸?tag-in 鐠侯垰绶?`SetInputModeAgent` 閳?        // `tag_in_agent_for_user_long_running_command`)閵嗗倸鎮楅懓鍛Ц Warp BYOP 闁炬崘鐭炬稉?        // 濞搭喚鐛ラ惃鍕瘜鐟曚礁鍙嗛崣?controller `send_request_input` 濡偓濞?tagged-in 閳?濞夈劌鍙?
         // `lrc_command_id` 閳?chat_stream 閸氬牊鍨氶搹姘珯 subagent 閳?spawn CLISubagentView),
         let active_cli_subagent_view = model
             .block_list()

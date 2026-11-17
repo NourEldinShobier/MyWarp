@@ -104,7 +104,7 @@ use crate::banner::{Banner, BannerEvent, BannerState, BannerTextContent, Dismiss
 use crate::channel::{Channel, ChannelState};
 use crate::code::view::CodeView;
 use crate::drive::items::WarpDriveItemId;
-use crate::drive::{ObjectTypeAndId, ZapDriveObjectArgs};
+use crate::drive::{ObjectTypeAndId, WarpDriveObjectArgs};
 use crate::features::FeatureFlag;
 use crate::launch_configs::launch_config::{self, PaneMode, PaneTemplateType};
 use crate::persistence::ModelEvent;
@@ -122,7 +122,7 @@ use crate::terminal::local_tty;
 use crate::terminal::model::session::Session;
 use crate::terminal::session_settings::NewSessionSource;
 use crate::terminal::session_settings::SessionSettings;
-// Zap:删除 ShareSessionModal import(云端 shared session 弹窗)
+// Warp:删除 ShareSessionModal import(云端 shared session 弹窗)
 use crate::terminal::shared_session::IsSharedSessionCreator;
 use crate::terminal::view::ssh_file_upload::FileUploadId;
 use crate::terminal::view::{
@@ -157,7 +157,7 @@ pub use pane::ai_fact_pane::AIFactPane;
 pub use pane::code_diff_pane::CodeDiffPane;
 pub use pane::code_pane::CodePane;
 pub use pane::env_var_collection_pane::EnvVarCollectionPane;
-// Zap Wave 7-3:`EnvironmentManagementPane` 随 ambient-agent UI 子系统物理删。
+// Warp Wave 7-3:`EnvironmentManagementPane` 随 ambient-agent UI 子系统物理删。
 pub use pane::execution_profile_editor_pane::ExecutionProfileEditorPane;
 pub use pane::file_pane::FilePane;
 pub use pane::image_pane::ImagePane;
@@ -204,7 +204,7 @@ fn get_minimum_pane_size(app: &AppContext) -> f32 {
 /// 2. Otherwise look up by command name in the already-discovered
 ///    [`AvailableShells`]. Its shell discovery supplements the process `PATH`
 ///    with well-known install locations (e.g. `/opt/homebrew/bin` on macOS,
-///    MSYS2/WSL on Windows) that a raw `PATH` lookup would miss when Zap is
+///    MSYS2/WSL on Windows) that a raw `PATH` lookup would miss when Warp is
 ///    launched outside an interactive shell.
 /// 3. As a final fallback, perform a plain `PATH` lookup via
 ///    [`AvailableShell::try_from`] in case the user put something exotic in
@@ -479,15 +479,15 @@ pub enum Event {
     OpenPromptEditor,
     OpenAgentToolbarEditor,
     OpenCLIAgentToolbarEditor,
-    /// tell the workspace to open a file within Zap.
+    /// tell the workspace to open a file within Warp.
     OpenFileInWarp {
         /// The file path to open.
         path: PathBuf,
         /// The session that the path was opened from.
         session: Arc<Session>,
     },
-    ZapDriveLink {
-        open_warp_drive_args: ZapDriveObjectArgs,
+    WarpDriveLink {
+        open_warp_drive_args: WarpDriveObjectArgs,
     },
     #[cfg(feature = "local_fs")]
     OpenCodeInWarp {
@@ -562,7 +562,7 @@ pub enum Event {
     },
     /// Clears the hovered tab index so it no longer appears as highlighted drop target
     ClearHoveredTabIndex,
-    ZapDriveObjectInPane(ObjectUid),
+    WarpDriveObjectInPane(ObjectUid),
     OpenSuggestedAgentModeWorkflowModal {
         workflow_and_id: SuggestedAgentModeWorkflowAndId,
     },
@@ -620,7 +620,7 @@ pub enum Event {
         initial_content: Option<String>,
     },
     OpenAddRulePane,
-    // Zap Wave 7-3:`OpenEnvironmentManagementPane` event 随 ambient-agent UI
+    // Warp Wave 7-3:`OpenEnvironmentManagementPane` event 随 ambient-agent UI
     // 子系统物理删。
     OpenFilesPalette {
         source: PaletteSource,
@@ -635,7 +635,7 @@ pub enum Event {
         target: FileTarget,
         line_col: Option<LineAndColumnArg>,
     },
-    /// Zap:在终端里 Ctrl/Cmd+点击远端 SSH 会话输出中的文件路径时发出,
+    /// Warp:在终端里 Ctrl/Cmd+点击远端 SSH 会话输出中的文件路径时发出,
     /// 由 workspace 走 buffer-sync 协议在编辑器中打开远端文件。
     #[cfg(all(feature = "local_tty", feature = "local_fs"))]
     OpenRemoteFileFromTerminal {
@@ -800,18 +800,18 @@ pub struct PaneGroup {
     /// Mapping from pane IDs to their contents.
     pane_contents: HashMap<PaneId, Box<dyn AnyPaneContent>>,
 
-    // Zap:删除 terminal_with_open_share_block_modal / share_block_modal 字段(云端 share block)
+    // Warp:删除 terminal_with_open_share_block_modal / share_block_modal 字段(云端 share block)
     dragged_border: Option<DraggedBorder>,
     user_default_shell_changed_banner: ViewHandle<Banner<PaneGroupAction>>,
 
-    // Zap:删除 terminal_with_open_share_session_modal / share_session_modal 字段(云端 shared session)
+    // Warp:删除 terminal_with_open_share_session_modal / share_session_modal 字段(云端 shared session)
     /// Model that tracks the currently active file.
     active_file_model: ModelHandle<ActiveFileModel>,
     /// If there is an open summarization cancel dialog, the terminal pane ID where summarization is active.
     terminal_with_open_summarization_dialog: Option<TerminalPaneId>,
 
     /// Pane with an open environment setup mode selector modal (rendered at tab level).
-    // Zap Wave 7-3:`pane_with_open_environment_setup_mode_selector` /
+    // Warp Wave 7-3:`pane_with_open_environment_setup_mode_selector` /
     // `pane_with_open_agent_assisted_environment_modal` 随 ambient-agent UI 子系统
     // 物理删。
 
@@ -1853,7 +1853,7 @@ impl PaneGroup {
                     };
                     Ok((PaneData::new(pane_id), focus))
                 }
-            } // Zap Wave 7-3:`EnvironmentManagement` LeafContents arm 随 ambient-agent UI
+            } // Warp Wave 7-3:`EnvironmentManagement` LeafContents arm 随 ambient-agent UI
               // 子系统物理删。
         };
 
@@ -2293,7 +2293,7 @@ impl PaneGroup {
     }
 
     /// Send prompt change bindkey events to all terminal sessions in this pane group. This
-    /// is used for intra-session prompt switching between Zap prompt and PS1.
+    /// is used for intra-session prompt switching between Warp prompt and PS1.
     #[cfg_attr(not(feature = "local_tty"), allow(unused_variables))]
     pub fn send_prompt_change_bindkey_to_all_sessions(
         &self,
@@ -2360,17 +2360,17 @@ impl PaneGroup {
         _terminal_pane_id: TerminalPaneId,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Zap:share_session_modal 已删,no-op
+        // Warp:share_session_modal 已删,no-op
         ctx.notify();
     }
 
     /// Closes the share session modal if it is open. Does nothing otherwise. Does not change
     /// which element is focused.
     fn close_share_session_modal(&mut self, _ctx: &mut ViewContext<Self>) {
-        // Zap:share_session_modal 已删,no-op
+        // Warp:share_session_modal 已删,no-op
     }
 
-    // Zap:删除 handle_share_session_modal_event(云端 shared session 弹窗)
+    // Warp:删除 handle_share_session_modal_event(云端 shared session 弹窗)
 
     fn new_internal(
         tips_completed: ModelHandle<TipsCompleted>,
@@ -2421,7 +2421,7 @@ impl PaneGroup {
             me.handle_focus_state_event(event, ctx);
         });
 
-        // Zap:删除 share_block_modal 注册(云端 share block)
+        // Warp:删除 share_block_modal 注册(云端 share block)
 
         ctx.subscribe_to_model(&PaneSettings::handle(ctx), |_, _, _, ctx| {
             ctx.notify();
@@ -2431,7 +2431,7 @@ impl PaneGroup {
             Banner::<PaneGroupAction>::new_permanently_dismissible(
                 BannerTextContent::formatted_text(vec![
                     FormattedTextFragment::plain_text(
-                        "Zap doesn't currently support your default shell, falling back to zsh.  ",
+                        "Warp doesn't currently support your default shell, falling back to zsh.  ",
                     ),
                     FormattedTextFragment::hyperlink(
                         crate::t!("common-learn-more"),
@@ -2465,7 +2465,7 @@ impl PaneGroup {
             },
         );
 
-        // Zap:删除 share_session_modal 注册(云端 shared session 弹窗)
+        // Warp:删除 share_session_modal 注册(云端 shared session 弹窗)
 
         ctx.subscribe_to_model(&UndoCloseStack::handle(ctx), |me, _, event, ctx| {
             let UndoCloseStackEvent::DiscardPane(pane_id) = event;
@@ -2486,7 +2486,7 @@ impl PaneGroup {
             user_default_shell_changed_banner,
             active_file_model,
             terminal_with_open_summarization_dialog: None,
-            // Zap Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
+            // Warp Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
             // 字段随 UI 物理删。
             right_panel_open: false,
             left_panel_open: false,
@@ -3238,7 +3238,7 @@ impl PaneGroup {
 
         let _ = ambient_agent_task_id;
 
-        // Insert the conversation ended tombstone (includes Open in Zap button on WASM).
+        // Insert the conversation ended tombstone (includes Open in Warp button on WASM).
         if terminal_manager.is_some() {
             terminal_view.update(ctx, |view, ctx| {
                 view.insert_conversation_ended_tombstone(ctx);
@@ -3272,7 +3272,7 @@ impl PaneGroup {
         }
     }
 
-    // Zap:删除 handle_share_block_modal_event(云端 share block)
+    // Warp:删除 handle_share_block_modal_event(云端 share block)
 
     /// Used to add a new pane but not splitting panes.
     pub fn add_terminal_pane(
@@ -3880,8 +3880,8 @@ impl PaneGroup {
                 self.hide_closed_pane(pane_id, ctx);
             }
 
-            // Zap:删除 share_block_modal cleanup(云端 share block)
-            // Zap Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
+            // Warp:删除 share_block_modal cleanup(云端 share block)
+            // Warp Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
             // 字段 cleanup 随 UI 物理删。
 
             self.focus_next_terminal_pane_and_activate_session(
@@ -3904,8 +3904,8 @@ impl PaneGroup {
 
             self.clean_up_pane(pane_id, ctx);
 
-            // Zap:删除 share_block_modal cleanup(云端 share block)
-            // Zap Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
+            // Warp:删除 share_block_modal cleanup(云端 share block)
+            // Warp Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
             // 字段 cleanup 随 UI 物理删。
 
             self.focus_next_terminal_pane_and_activate_session(
@@ -4912,7 +4912,7 @@ impl PaneGroup {
         });
 
         let terminal_view = terminal_manager.as_ref(ctx).view();
-        // Insert the conversation ended tombstone (includes Open in Zap button on WASM)
+        // Insert the conversation ended tombstone (includes Open in Warp button on WASM)
         terminal_view.update(ctx, |view, ctx| {
             view.insert_conversation_ended_tombstone(ctx);
         });
@@ -6083,7 +6083,7 @@ impl PaneGroup {
         );
 
         self.close_share_session_modal(ctx);
-        // Zap:删除 terminal_with_open_share_block_modal 清空(字段已不存在)
+        // Warp:删除 terminal_with_open_share_block_modal 清空(字段已不存在)
         ctx.notify();
     }
 
@@ -6226,7 +6226,7 @@ impl View for PaneGroup {
 
         let mut stack = Stack::new().with_child(column.finish());
 
-        // Zap:删除 share_block_modal / share_session_modal / role-change modal 渲染分支(字段已不存在)
+        // Warp:删除 share_block_modal / share_session_modal / role-change modal 渲染分支(字段已不存在)
 
         // Render the summarization cancel dialog at tab level when open.
         if let Some(terminal_pane_id) = self.terminal_with_open_summarization_dialog {
@@ -6239,7 +6239,7 @@ impl View for PaneGroup {
             }
         }
 
-        // Zap Wave 7-3:environment setup mode selector / agent-assisted environment
+        // Warp Wave 7-3:environment setup mode selector / agent-assisted environment
         // modal 在 tab 层级的覆盖渲染随 ambient-agent UI 子系统物理删。
 
         stack.finish()

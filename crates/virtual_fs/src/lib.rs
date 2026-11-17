@@ -21,7 +21,7 @@ pub struct Dirs {
 impl Dirs {
     #[allow(dead_code)]
     pub fn git_repository_fixture(&self) -> PathBuf {
-        Zap::fixtures().join("git_repository")
+        Warp::fixtures().join("git_repository")
     }
 }
 
@@ -156,9 +156,9 @@ impl VirtualFS {
     }
 }
 
-pub struct Zap;
+pub struct Warp;
 
-impl Zap {
+impl Warp {
     #[allow(dead_code)]
     pub fn executable() -> PathBuf {
         let mut path = {

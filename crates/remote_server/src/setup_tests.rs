@@ -196,12 +196,12 @@ fn parse_preinstall_missing_status_falls_open() {
 }
 
 #[test]
-fn oss_remote_server_dir_uses_zap_namespace() {
-    assert_eq!(remote_server_dir(), "~/.zap/remote-server");
+fn oss_remote_server_dir_uses_warp_namespace() {
+    assert_eq!(remote_server_dir(), "~/.warp/remote-server");
 }
 
 #[test]
-fn oss_binary_name_matches_zap_cli() {
+fn oss_binary_name_matches_warp_cli() {
     assert_eq!(binary_name(), "warp-oss");
 }
 
@@ -223,12 +223,12 @@ fn oss_download_tarball_url_uses_github_release_asset() {
 }
 
 #[test]
-fn install_script_uses_zap_asset_and_staging_placeholder() {
-    let script = install_script(Some("~/.zap/remote-server/zap-upload.tar.gz"));
+fn install_script_uses_warp_asset_and_staging_placeholder() {
+    let script = install_script(Some("~/.warp/remote-server/warp-upload.tar.gz"));
 
     assert!(script
-        .contains("staging_tarball_path=\"~/.zap/remote-server/zap-upload.tar.gz\""));
-    assert!(script.contains("zap-$os_name-$arch_name.tar.gz"));
+        .contains("staging_tarball_path=\"~/.warp/remote-server/warp-upload.tar.gz\""));
+    assert!(script.contains("warp-$os_name-$arch_name.tar.gz"));
     assert!(!script.contains("app.warp.dev"));
     assert!(!script.contains("/download/cli"));
 }

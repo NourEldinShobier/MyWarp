@@ -80,7 +80,7 @@ warp_ripgrep = { path = "crates/warp_ripgrep" }
 warp_ssh_manager = { path = "crates/warp_ssh_manager" }
 warp_terminal = { path = "crates/warp_terminal" }
 warp_util = { path = "crates/warp_util" }
-zap_sync = { path = "crates/zap_sync" }
+warp_sync = { path = "crates/warp_sync" }
 warp_web_event_bus = { path = "crates/warp_web_event_bus" }
 warpui = { path = "crates/warpui" }
 warpui_core = { path = "crates/warpui_core" }
@@ -148,7 +148,7 @@ hex = "0.4.3"
 # This matches the version of hyper used by reqwest.
 hyper = "1.6.0"
 html5ever = "0.35.0"
-# Zap BYOP webfetch:HTML→Markdown(纯 Rust 端口的 Turndown 实现,
+# Warp BYOP webfetch:HTML→Markdown(纯 Rust 端口的 Turndown 实现,
 # 对应 opencode webfetch.ts 用的 turndown JS 库)。
 htmd = "0.2"
 http = "1.1.0"
@@ -558,7 +558,7 @@ tink-hybrid = { git = "https://github.com/warpdotdev/tink-rust", branch = "warpd
 tikv-jemallocator = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
 tikv-jemalloc-sys = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
 
-# Zap 本地 fork — 解锁 DeepSeek thinking_mode `reasoning_effort` 顶层注入。
+# Warp 本地 fork — 解锁 DeepSeek thinking_mode `reasoning_effort` 顶层注入。
 # 上游 genai 0.6.0-beta.18 在 adapter_shared.rs:85 把 reasoning_effort 注入条件
 # 硬编码为 `adapter_kind == OpenAI`,DeepSeek 走 else 分支被吞,即便 client 端把
 # ChatOptions::reasoning_effort 设为 high/medium/low,HTTP body 顶层也不会出现该字段。

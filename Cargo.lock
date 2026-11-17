@@ -14921,8 +14921,8 @@ dependencies = [
  "winit",
  "winreg",
  "x11rb",
- "zap_sftp",
- "zap_sync",
+ "warp_sftp",
+ "warp_sync",
  "zbus 5.16.0",
  "zeroize",
  "zmodem2",
@@ -15296,7 +15296,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "uuid",
- "zap_sync",
+ "warp_sync",
  "zeroize",
 ]
 
@@ -17118,7 +17118,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zap_sftp"
+name = "warp_sftp"
 version = "0.1.0"
 dependencies = [
  "openssl-sys",
@@ -17129,7 +17129,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zap_sync"
+name = "warp_sync"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
