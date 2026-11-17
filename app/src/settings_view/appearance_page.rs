@@ -540,6 +540,8 @@ pub struct AppearanceSettingsPageView {
     zoom_level_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     zoom_reset_button_mouse_state: MouseStateHandle,
     available_families: HashMap<String, (Option<FamilyId>, FontType)>,
+    /// Whether the system font scan was started (deferred until the page is first shown).
+    system_fonts_requested: bool,
     view_font_type: FontType,
     alt_screen_padding_editor: ViewHandle<EditorView>,
     color_picker_dot_states: Vec<Vec<MouseStateHandle>>,
@@ -1096,19 +1098,6 @@ impl AppearanceSettingsPageView {
             ctx,
         );
 
-        // Don't load all available system fonts in integration tests; we don't
-        // have any integration tests which interact with the font dropdown, and
-        // loading them in the background slows down test execution.
-        if ChannelState::channel() != Channel::Integration {
-            // There's no such thing as a "system font" on the web, so the
-            // `all_system_fonts` API doesn't exist.
-            #[cfg(not(target_family = "wasm"))]
-            {
-                let all_system_fonts = warpui::fonts::Cache::handle(ctx)
-                    .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
-                ctx.spawn(all_system_fonts, Self::set_system_fonts);
-            }
-        }
         let font_family_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = FilterableDropdown::new(ctx);
             dropdown.set_top_bar_max_width(FONT_FAMILY_DROPDOWN_WIDTH);
@@ -1404,6 +1393,7 @@ impl AppearanceSettingsPageView {
             zoom_level_dropdown: Self::build_zoom_level_dropdown(ctx),
             zoom_reset_button_mouse_state: MouseStateHandle::default(),
             available_families: Default::default(),
+            system_fonts_requested: false,
             view_font_type: Default::default(),
             color_picker_dot_states: (0..directory_tab_colors(ctx).len())
                 .map(|_| {
@@ -2496,6 +2486,36 @@ impl AppearanceSettingsPageView {
         });
 
         ctx.notify();
+    }
+
+    /// Starts the system font scan the first time the Appearance page is shown.
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
+    fn request_system_fonts(&mut self, ctx: &mut ViewContext<Self>) {
+        if self.system_fonts_requested {
+            return;
+        }
+        self.system_fonts_requested = true;
+
+        // Don't load all available system fonts in integration tests; we don't
+        // have any integration tests which interact with the font dropdown, and
+        // loading them in the background slows down test execution.
+        if ChannelState::channel() != Channel::Integration {
+            // There's no such thing as a "system font" on the web, so the
+            // `all_system_fonts` API doesn't exist.
+            #[cfg(not(target_family = "wasm"))]
+            {
+                let start = std::time::Instant::now();
+                let all_system_fonts = warpui::fonts::Cache::handle(ctx)
+                    .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
+                ctx.spawn(all_system_fonts, move |me, fonts, ctx| {
+                    log::info!(
+                        "startup perf: appearance system fonts took {} ms",
+                        start.elapsed().as_millis()
+                    );
+                    me.set_system_fonts(fonts, ctx);
+                });
+            }
+        }
     }
 
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
@@ -6092,6 +6112,7 @@ impl SettingsPageMeta for AppearanceSettingsPageView {
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {
+        self.request_system_fonts(ctx);
         ctx.notify();
     }
 

@@ -317,7 +317,12 @@ impl Cache {
         ctx.spawn(
             self.platform.load_all_system_fonts(),
             |me, loaded_system_fonts, _ctx| {
+                let start = std::time::Instant::now();
                 let system_fonts = me.platform.process_loaded_system_fonts(loaded_system_fonts);
+                log::info!(
+                    "startup perf: process_loaded_system_fonts (main thread) took {} ms",
+                    start.elapsed().as_millis()
+                );
                 me.available_system_fonts = Some(system_fonts.clone());
                 for sender in std::mem::take(&mut me.pending_system_fonts_senders) {
                     let _ = sender.send(system_fonts.clone());

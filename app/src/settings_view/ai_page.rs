@@ -3395,26 +3395,41 @@ impl TypedActionView for AISettingsPageView {
             }
             AISettingsPageAction::EnsureModelsDevLoaded => {
                 use crate::ai::agent_providers::models_dev;
-                let had_disk = models_dev::load_from_disk();
-                if !had_disk || models_dev::is_stale() {
-                    let client = http_client::Client::new();
-                    ctx.spawn(
-                        async move { models_dev::fetch_and_cache(client).await },
-                        |view, result, ctx| match result {
-                            Ok(()) => {
-                                models_dev::set_fetch_failed(false);
-                                view.rebuild_current_page(ctx);
-                            }
-                            Err(e) => {
-                                log::warn!("[models.dev] 拉取失败: {e}");
-                                models_dev::set_fetch_failed(true);
-                                ctx.notify();
-                            }
-                        },
+                // 磁盘读取 + JSON 解析放到后台线程,避免阻塞主线程。
+                let (tx, rx) = futures::channel::oneshot::channel();
+                std::thread::spawn(move || {
+                    let start = std::time::Instant::now();
+                    let had_disk = models_dev::load_from_disk();
+                    log::info!(
+                        "startup perf: models.dev load_from_disk took {} ms",
+                        start.elapsed().as_millis()
                     );
-                } else {
-                    ctx.notify();
-                }
+                    let _ = tx.send(had_disk);
+                });
+                ctx.spawn(
+                    async move { rx.await.unwrap_or(false) },
+                    |_, had_disk, ctx| {
+                        if !had_disk || models_dev::is_stale() {
+                            let client = http_client::Client::new();
+                            ctx.spawn(
+                                async move { models_dev::fetch_and_cache(client).await },
+                                |view, result, ctx| match result {
+                                    Ok(()) => {
+                                        models_dev::set_fetch_failed(false);
+                                        view.rebuild_current_page(ctx);
+                                    }
+                                    Err(e) => {
+                                        log::warn!("[models.dev] 拉取失败: {e}");
+                                        models_dev::set_fetch_failed(true);
+                                        ctx.notify();
+                                    }
+                                },
+                            );
+                        }
+                        // 磁盘目录已加载,渲染时通过 `cached()` 读取。
+                        ctx.notify();
+                    },
+                );
             }
             AISettingsPageAction::RefreshModelsDev => {
                 use crate::ai::agent_providers::models_dev;
@@ -3633,6 +3648,14 @@ impl SettingsPageMeta for AISettingsPageView {
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {
+        // Load the models.dev catalog only when the providers widget is actually shown.
+        if matches!(self.active_subpage, None | Some(AISubpage::Providers))
+            && (crate::ai::agent_providers::models_dev::cached().is_none()
+                || crate::ai::agent_providers::models_dev::is_stale())
+        {
+            ctx.dispatch_typed_action_deferred(AISettingsPageAction::EnsureModelsDevLoaded);
+        }
+
         if UserWorkspaces::as_ref(ctx).is_byo_api_key_enabled() {
             return;
         }
