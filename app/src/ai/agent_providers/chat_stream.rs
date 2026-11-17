@@ -3131,6 +3131,16 @@ fn opencode_compatible_cache_provider(base_url: &str) -> bool {
         || u.contains("opencode.ai/zen")
 }
 
+/// OpenAI 24h Extended Cache(`prompt_cache_retention="24h"`)支持的型号前缀。
+/// 仅按字面前缀判定;未识别的型号不下发,避免被严格校验的上游 400 拒绝。
+fn openai_supports_extended_cache(model_id: &str) -> bool {
+    const PREFIXES: &[&str] = &["gpt-5", "gpt-4.1", "o1", "o3", "o4"];
+    let m = model_id.to_ascii_lowercase();
+    PREFIXES
+        .iter()
+        .any(|p| m.starts_with(p) || m.contains(&format!("/{p}")))
+}
+
 fn build_chat_options(
     api_type: AgentProviderApiType,
     base_url: &str,
@@ -3151,7 +3161,8 @@ fn build_chat_options(
     // Prompt caching(1:1 对齐 opencode `packages/opencode/src/provider/transform.ts`
     // 的 `options()` 函数)。要点:
     //
-    // 1. **`prompt_cache_retention` 字段(genai `ChatOptions::cache_control`)从不下发**。
+    // 1. **`prompt_cache_retention`(genai `ChatOptions::cache_control`)仅在官方
+    //    api.openai.com + 支持 24h 的型号(GPT-5 / 4.1 / o-series)时下发 "24h",其余不发**。
     //    opencode 整个仓库不使用这个字段;严格 schema 校验的 BYOP 中转
     //    (OpenCode Go / vLLM / lm-studio / 大部分国内代理)会以 HTTP 400
     //    `Extra inputs are not permitted, field: 'prompt_cache_retention'` 拒绝
@@ -3177,6 +3188,12 @@ fn build_chat_options(
             if !cid.is_empty() {
                 opts = opts.with_prompt_cache_key(cid.to_owned());
             }
+        }
+        // 24h retention 仅发给官方 api.openai.com(其余白名单/中转可能 400,见 #126)。
+        if base_url.to_ascii_lowercase().contains("api.openai.com")
+            && openai_supports_extended_cache(model_id)
+        {
+            opts = opts.with_cache_control(CacheControl::Ephemeral24h);
         }
     }
 
@@ -6042,9 +6059,12 @@ mod cache_boundary_stability_tests {
                 Some("conv-1"),
                 "{url}: 白名单 provider 应下发 prompt_cache_key=conversation_id"
             );
-            assert!(
-                opts.cache_control.is_none(),
-                "{url}: cache_control 永远不发(opencode 不使用 prompt_cache_retention)"
+            let expected = url
+                .contains("api.openai.com")
+                .then_some(CacheControl::Ephemeral24h);
+            assert_eq!(
+                opts.cache_control, expected,
+                "{url}: 仅官方 api.openai.com 下发 24h cache_control"
             );
         }
     }
@@ -6105,7 +6125,7 @@ mod cache_boundary_stability_tests {
             Some("conv-resp"),
         );
         assert_eq!(on_whitelist.prompt_cache_key.as_deref(), Some("conv-resp"));
-        assert!(on_whitelist.cache_control.is_none());
+        assert_eq!(on_whitelist.cache_control, Some(CacheControl::Ephemeral24h));
 
         let off_whitelist = build_chat_options(
             AgentProviderApiType::OpenAiResp,
@@ -6135,7 +6155,23 @@ mod cache_boundary_stability_tests {
             opts.prompt_cache_key.is_none(),
             "空 conversation_id 应跳过 prompt_cache_key"
         );
-        assert!(opts.cache_control.is_none(), "cache_control 永远不发");
+        assert_eq!(opts.cache_control, Some(CacheControl::Ephemeral24h));
+    }
+
+    #[test]
+    fn extended_cache_only_for_supported_models_on_official_endpoint() {
+        use crate::settings::ReasoningEffortSetting as R;
+        for (model, want) in [("gpt-4o", false), ("gpt-5.5-pro", true), ("o3-mini", true)] {
+            let o = build_chat_options(
+                AgentProviderApiType::OpenAi,
+                "https://api.openai.com/v1/",
+                model,
+                R::Auto,
+                vec![],
+                Some("c"),
+            );
+            assert_eq!(o.cache_control.is_some(), want, "{model}");
+        }
     }
 
     fn opencode_session_headers(
