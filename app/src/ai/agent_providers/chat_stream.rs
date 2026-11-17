@@ -3758,16 +3758,37 @@ pub async fn generate_byop_output(
         }
 
         log::info!("[byop] opening stream: model={model_id}");
-        let mut sdk_stream = match client
-            .exec_chat_stream(&model_id, chat_req, Some(&chat_opts))
-            .await
-        {
-            Ok(resp) => {
-                log::info!("[byop] stream opened OK (HTTP request accepted)");
-                resp.stream
+        // Retry transient open failures (429/5xx/dropped connection) with 2/4/8s backoff.
+        // Nothing has been emitted for this reply yet, so a retry cannot duplicate output.
+        let mut open_retries: u32 = 0;
+        let open_result = loop {
+            let err = match client
+                .exec_chat_stream(&model_id, chat_req.clone(), Some(&chat_opts))
+                .await
+            {
+                Ok(resp) => {
+                    log::info!("[byop] stream opened OK (HTTP request accepted)");
+                    break Ok(resp.stream);
+                }
+                Err(e) => map_genai_error(e),
+            };
+            let status = match &err {
+                OpenAiCompatibleError::Status { status, body } => Some((*status, body.as_str())),
+                OpenAiCompatibleError::Stream(_) => None,
+                _ => break Err(err),
+            };
+            match super::retry::next_delay(open_retries, status) {
+                Some(wait) => {
+                    open_retries += 1;
+                    log::warn!("[byop] open stream failed ({err}); retry {open_retries} in {wait:?}");
+                    warpui::r#async::Timer::after(wait).await;
+                }
+                None => break Err(err),
             }
-            Err(e) => {
-                let mapped = map_genai_error(e);
+        };
+        let mut sdk_stream = match open_result {
+            Ok(stream) => stream,
+            Err(mapped) => {
                 log::error!("[byop] open stream failed: {mapped:#}");
                 yield Err(Arc::new(AIApiError::Other(anyhow::anyhow!(
                     "BYOP open stream failed: {mapped}"
