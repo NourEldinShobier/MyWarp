@@ -71,7 +71,7 @@ if ($DEBUG_BUILD) {
     # a normal release build (e.g. in stable).
     $CARGO_PROFILE = 'rltoda'
 } else {
-    $CARGO_PROFILE = 'rlto'
+    $CARGO_PROFILE = 'fast'
 }
 
 if ($CARGO_PROFILE -eq 'dev') {
