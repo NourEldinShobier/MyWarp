@@ -1546,8 +1546,19 @@ impl TextLayoutSystem {
     ) -> futures::future::BoxFuture<'static, Box<dyn platform::LoadedSystemFonts>> {
         use futures::FutureExt as _;
 
-        async { Box::new(loader::load_all_system_fonts()) as Box<dyn platform::LoadedSystemFonts> }
-            .boxed()
+        // Scan on a real thread: the future is polled on the main thread, so
+        // doing the blocking scan inside it would stall the UI.
+        let (tx, rx) = futures::channel::oneshot::channel();
+        std::thread::spawn(move || {
+            let start = std::time::Instant::now();
+            let fonts = loader::load_all_system_fonts();
+            log::info!(
+                "startup perf: system font scan took {} ms",
+                start.elapsed().as_millis()
+            );
+            let _ = tx.send(Box::new(fonts) as Box<dyn platform::LoadedSystemFonts>);
+        });
+        async move { rx.await.expect("system font loader thread should not panic") }.boxed()
     }
 
     fn load_family_name_from_id(&self, id: FamilyId) -> Option<String> {

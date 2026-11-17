@@ -284,8 +284,8 @@ impl AgentProvidersWidget {
             rows.insert(provider.id.clone(), row);
         }
 
-        // 进入页面即触发一次目录加载(磁盘缓存 + 必要时网络)。
-        ctx.dispatch_typed_action_deferred(AISettingsPageAction::EnsureModelsDevLoaded);
+        // 目录加载(磁盘缓存 + 必要时网络)由 `AISettingsPageView::on_page_selected`
+        // 在 providers 页真正显示时触发,构造函数不再触发。
 
         // ---- 搜索框 ----
         let initial_query = crate::ai::agent_providers::models_dev::search_query();
