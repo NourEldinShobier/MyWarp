@@ -83,4 +83,4 @@ docs/openwarp-cloud-removal-plan.md
 script/windows/warp-launcher/warp.exe
 script/windows/warp-launcher/*.pdb
 
-script/windows/warp-launcher/zap.exe
+script/windows/warp-launcher/warp.exe

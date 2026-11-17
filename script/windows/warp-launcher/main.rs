@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-const APP_EXE: &str = "warp-oss.exe";
+const APP_EXE: &str = "warp.exe";
 const URL_SCHEME: &str = "warp";
 
 fn percent_encode(s: &str) -> String {

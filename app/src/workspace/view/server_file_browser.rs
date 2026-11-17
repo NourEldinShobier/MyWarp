@@ -4749,8 +4749,8 @@ mod tests {
     fn rebases_loaded_directory_entries_to_parent_depth() {
         let entries = vec![
             entry(
-                "/root/.openwarp/remote-server/warp-oss",
-                "warp-oss",
+                "/root/.openwarp/remote-server/warp",
+                "warp",
                 FileSystemEntryKind::File,
                 0,
             ),
@@ -4782,11 +4782,11 @@ mod tests {
         );
         assert_eq!(
             remap_path_after_rename(
-                "/root/test/old/bin/warp-oss",
+                "/root/test/old/bin/warp",
                 "/root/test/old",
                 "/root/test/new"
             ),
-            "/root/test/new/bin/warp-oss"
+            "/root/test/new/bin/warp"
         );
         assert_eq!(
             remap_path_after_rename("/root/other", "/root/test/old", "/root/test/new"),
@@ -4831,8 +4831,8 @@ mod tests {
             0,
         );
         let child = entry(
-            "/root/.openwarp/remote-server/warp-oss",
-            "warp-oss",
+            "/root/.openwarp/remote-server/warp",
+            "warp",
             FileSystemEntryKind::File,
             0,
         );
@@ -4855,7 +4855,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 ("/root/.openwarp/remote-server", 0),
-                ("/root/.openwarp/remote-server/warp-oss", 1),
+                ("/root/.openwarp/remote-server/warp", 1),
             ]
         );
     }

@@ -294,10 +294,10 @@ async fn musl_target_installed() -> bool {
 /// profile / features 与 `script/deploy_remote_server` 对齐。
 async fn cross_compile_remote_server(backend: &DevBuildBackend) -> Result<PathBuf> {
     let root = workspace_root();
-    // 当前 channel 对应的 `[[bin]]` 名 —— OSS fork 是 `warp-oss`(见 app/Cargo.toml)。
+    // 当前 channel 对应的 `[[bin]]` 名 —— OSS fork 是 `warp`(见 app/Cargo.toml)。
     // 不能写死 `warp`:`warp` 那个 bin 走 `load_config!("local")`,需要私有的
     // `warp-channel-config` 才能生成 `local_config.json`,OSS fork 没有它会编译失败;
-    // `warp-oss`(src/bin/oss.rs)内联 `ChannelConfig`,无此依赖。
+    // `warp`(src/bin/oss.rs)内联 `ChannelConfig`,无此依赖。
     let bin_name = remote_server::setup::binary_name();
     let backend_desc = match backend {
         DevBuildBackend::Zigbuild => "cargo-zigbuild".to_string(),

@@ -202,7 +202,7 @@ fn oss_remote_server_dir_uses_warp_namespace() {
 
 #[test]
 fn oss_binary_name_matches_warp_cli() {
-    assert_eq!(binary_name(), "warp-oss");
+    assert_eq!(binary_name(), "warp");
 }
 
 #[test]

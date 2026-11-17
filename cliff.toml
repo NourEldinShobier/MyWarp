@@ -1,4 +1,4 @@
-# git-cliff 配置 — 用于在 Zap Release 发布时自动生成「自上个 tag 以来的变更」。
+# git-cliff 配置 — 用于在 Warp Release 发布时自动生成「自上个 tag 以来的变更」。
 #
 # 设计原则:
 # - 主分组按 conventional commit type(feat/fix/refactor/docs/test/build/ci/ui/perf/chore)。
@@ -45,7 +45,7 @@ filter_unconventional = false
 # 不拆分多行 body — 一条 commit 一条记录。
 split_commits = false
 
-# tag 命名:v 前缀 + 任意尾巴(v2026.05.27.2 / v2026.05.06.preview / v2026.05.21.zaptest01)。
+# tag 命名:v 前缀 + 任意尾巴(v2026.05.27.2 / v2026.05.06.preview / v2026.05.21.warptest01)。
 tag_pattern = "v[0-9].*"
 
 # 顺序按 commit 在 git log 中出现的顺序(新 → 旧),保持可读性。

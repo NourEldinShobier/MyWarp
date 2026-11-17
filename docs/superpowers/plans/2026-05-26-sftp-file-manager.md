@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为 Zap 终端添加原生 SFTP 文件管理器，使用 ssh2 crate 实现协议层，WarpUI 实现浏览器 Pane 面板。
+**Goal:** 为 Warp 终端添加原生 SFTP 文件管理器，使用 ssh2 crate 实现协议层，WarpUI 实现浏览器 Pane 面板。
 
 **Architecture:** 新增 `warp_sftp` crate 封装 ssh2 协议操作（连接、文件读写、目录管理），在 `app/src/sftp_manager/` 中实现 WarpUI 浏览器视图，通过 `SftpPane` 集成到 Pane 系统。复用现有 `warp_ssh_manager` 获取主机信息和凭据。
 
@@ -1592,8 +1592,8 @@ git commit -m "feat: 接入 SSH 管理器右键菜单，支持打开 SFTP 浏览
 
 1. `use warp_sftp::session_bridge::` → `use warp_sftp::session::`
 2. `use crate::sftp_manager::sftp_ops` 保持不变
-3. 所有 `warp_core::ui::appearance::Appearance` 确认 zap-2 中使用相同的 import 路径
-4. 确认 `Icon` 枚举中的变体名在 zap-2 的 `ui_components::icons::Icon` 中存在
+3. 所有 `warp_core::ui::appearance::Appearance` 确认 warp-2 中使用相同的 import 路径
+4. 确认 `Icon` 枚举中的变体名在 warp-2 的 `ui_components::icons::Icon` 中存在
 
 完整实现包括：
 - `SftpBrowserAction` 枚举（所有 Action）
@@ -1697,7 +1697,7 @@ Expected: 可能有一些 import 路径差异或缺失的 match arm
 常见需要修复的问题：
 1. `LeftPanelEvent` 枚举中缺少 `OpenSftpPane` 变体 → 添加
 2. `persistence/sqlite.rs` 中 `LeafContents` 的 match 缺少 `Sftp` 分支 → 添加（不持久化）
-3. `Icon` 枚举中某些变体名不同 → 替换为 zap-2 中对应的名称
+3. `Icon` 枚举中某些变体名不同 → 替换为 warp-2 中对应的名称
 4. import 路径差异（`warp_core::ui::` vs 其他路径）→ 修正
 
 - [ ] **Step 3: 再次全量编译**

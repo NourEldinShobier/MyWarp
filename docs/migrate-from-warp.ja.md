@@ -1,16 +1,16 @@
-# Zap への設定の移行
+# Warp への設定の移行
 
 [English](./migrate-from-warp.md) · [简体中文](./migrate-from-warp.zh-CN.md)
 
 このガイドは、**設定系の構成**(カスタムキーバインド・テーマ・ワークフロー・
-MCP 設定など)を以前のインストールから Zap へ引き継ぎたい方向けです。
+MCP 設定など)を以前のインストールから Warp へ引き継ぎたい方向けです。
 
 移行元として想定されるのは 2 つあり、**両者では安全性プロファイルが異なる**ため、
 本書では別々のセクションで扱います。両方該当する場合は、**まず OpenWarp から
 移行してから** Warp の移行を検討してください。
 
-1. **OpenWarp** —— Zap の以前の名称。
-2. **上流の [Warp](https://github.com/warpdotdev/warp)** —— Zap が fork して
+1. **OpenWarp** —— Warp の以前の名称。
+2. **上流の [Warp](https://github.com/warpdotdev/warp)** —— Warp が fork して
    いるプロジェクト。
 
 本書は コマンド履歴・SQLite データベース・Drive オブジェクト・認証情報の
@@ -22,7 +22,7 @@ MCP 設定など)を以前のインストールから Zap へ引き継ぎたい�
 
 ## ディスク上のレイアウト
 
-Zap(および OpenWarp / 上流 Warp も同様)はディスク上の状態を **3 種類の
+Warp(および OpenWarp / 上流 Warp も同様)はディスク上の状態を **3 種類の
 ディレクトリ**に分けて格納します:
 
 - **config** —— `settings.toml`、`keybindings.yaml`
@@ -30,18 +30,18 @@ Zap(および OpenWarp / 上流 Warp も同様)はディスク上の状態を **
 - **home dotfile** —— `.mcp.json`、`skills/`
 
 macOS では 3 カテゴリーがいずれも単一の home dotfile ディレクトリ
-(`~/.warp/`、`~/.openwarp/`、または `~/.zap/`)に集約されます。Linux では
+(`~/.warp/`、`~/.openwarp/`、または `~/.warp/`)に集約されます。Linux では
 XDG 規約に従って **3 つの異なる場所** に分かれ、Windows では `directories`
 クレートの同等レイアウトで分かれます。下記の移行スクリプトはプラットフォーム
 ごとに各ファイルを正しい保存先に配置します。
 
-### Zap の保存先
+### Warp の保存先
 
 | カテゴリー | macOS | Linux | Windows |
 |---|---|---|---|
-| config | `~/.zap/` | `${XDG_CONFIG_HOME:-~/.config}/zap/` | `%LOCALAPPDATA%\zap\Zap\config\` |
-| data | `~/.zap/` | `${XDG_DATA_HOME:-~/.local/share}/zap/` | `%APPDATA%\zap\Zap\data\` |
-| home dotfile | `~/.zap/` | `~/.zap/` | `%USERPROFILE%\.zap\` |
+| config | `~/.warp/` | `${XDG_CONFIG_HOME:-~/.config}/warp/` | `%LOCALAPPDATA%\warp\Warp\config\` |
+| data | `~/.warp/` | `${XDG_DATA_HOME:-~/.local/share}/warp/` | `%APPDATA%\warp\Warp\data\` |
+| home dotfile | `~/.warp/` | `~/.warp/` | `%USERPROFILE%\.warp\` |
 
 ### OpenWarp のソースパス
 
@@ -70,8 +70,8 @@ XDG 規約に従って **3 つの異なる場所** に分かれ、Windows では
 
 ## 1. OpenWarp からの移行(既存ユーザーの推奨経路)
 
-OpenWarp は改名前の Zap そのものです。改名コミット
-(`feat: rename project Warp/OpenWarp → Zap`)は識別子とディスク上のパス名を
+OpenWarp は改名前の Warp そのものです。改名コミット
+(`feat: rename project Warp/OpenWarp → Warp`)は識別子とディスク上のパス名を
 変更しただけで、**設定ファイルのフォーマットと schema は一切変わっていません**。
 下記のファイルはそのままコピーできます。
 
@@ -90,16 +90,16 @@ OpenWarp は改名前の Zap そのものです。改名コミット
 
 ### 手順
 
-> コピー前に **Zap を終了**してください。プロセスがファイルを掴んでいると
+> コピー前に **Warp を終了**してください。プロセスがファイルを掴んでいると
 > 失敗します。
 
 **macOS**
 
 ```sh
-mkdir -p "$HOME/.zap"
+mkdir -p "$HOME/.warp"
 for f in settings.toml keybindings.yaml themes workflows launch_configurations tab_configs skills .mcp.json; do
-  if [ -e "$HOME/.openwarp/$f" ] && [ ! -e "$HOME/.zap/$f" ]; then
-    cp -R "$HOME/.openwarp/$f" "$HOME/.zap/$f"
+  if [ -e "$HOME/.openwarp/$f" ] && [ ! -e "$HOME/.warp/$f" ]; then
+    cp -R "$HOME/.openwarp/$f" "$HOME/.warp/$f"
   fi
 done
 ```
@@ -111,9 +111,9 @@ src_config="${XDG_CONFIG_HOME:-$HOME/.config}/openwarp"
 src_data="${XDG_DATA_HOME:-$HOME/.local/share}/openwarp"
 src_home="$HOME/.openwarp"
 
-dst_config="${XDG_CONFIG_HOME:-$HOME/.config}/zap"
-dst_data="${XDG_DATA_HOME:-$HOME/.local/share}/zap"
-dst_home="$HOME/.zap"
+dst_config="${XDG_CONFIG_HOME:-$HOME/.config}/warp"
+dst_data="${XDG_DATA_HOME:-$HOME/.local/share}/warp"
+dst_home="$HOME/.warp"
 mkdir -p "$dst_config" "$dst_data" "$dst_home"
 
 copy() {
@@ -139,9 +139,9 @@ $src_config = "$env:LOCALAPPDATA\openwarp\OpenWarp\config"
 $src_data   = "$env:APPDATA\openwarp\OpenWarp\data"
 $src_home   = "$env:USERPROFILE\.openwarp"
 
-$dst_config = "$env:LOCALAPPDATA\zap\Zap\config"
-$dst_data   = "$env:APPDATA\zap\Zap\data"
-$dst_home   = "$env:USERPROFILE\.zap"
+$dst_config = "$env:LOCALAPPDATA\warp\Warp\config"
+$dst_data   = "$env:APPDATA\warp\Warp\data"
+$dst_home   = "$env:USERPROFILE\.warp"
 New-Item -ItemType Directory -Force -Path $dst_config, $dst_data, $dst_home | Out-Null
 
 function Copy-IfMissing($srcDir, $dstDir, $name) {
@@ -162,11 +162,11 @@ Copy-IfMissing $src_home   $dst_home   .mcp.json
 Copy-IfMissing $src_home   $dst_home   skills
 ```
 
-`[ ! -e ... ]` / `-not (Test-Path $to)` のガードは、Zap 側で既にカスタマイズ
+`[ ! -e ... ]` / `-not (Test-Path $to)` のガードは、Warp 側で既にカスタマイズ
 した内容を上書きしないためのものです。OpenWarp の値で上書きしたい場合は外して
 ください。
 
-Zap が問題なく動くことを確認したら、上記の OpenWarp ディレクトリを削除して
+Warp が問題なく動くことを確認したら、上記の OpenWarp ディレクトリを削除して
 ディスク領域を回収できます。もう誰も使っていません。
 
 ---
@@ -174,14 +174,14 @@ Zap が問題なく動くことを確認したら、上記の OpenWarp ディレ
 ## 2. 上流 Warp からの移行
 
 上流 Warp は独立した別プロダクトで、独自のディスク上アイデンティティを持ち
-ます(上の「上流 Warp のソースパス」表を参照)。Zap はビルド時の channel が
-`Oss` で、独自の app id(`dev.zap.Zap`)と、プラットフォームごとに分かれた
+ます(上の「上流 Warp のソースパス」表を参照)。Warp はビルド時の channel が
+`Oss` で、独自の app id(`dev.warp.Warp`)と、プラットフォームごとに分かれた
 レイアウトを持ちます。両者のインストールは互いに相手のファイルを見ることが
-できません —— これは Warp のアカウントやクラウド状態を Zap に持ち込まない
+できません —— これは Warp のアカウントやクラウド状態を Warp に持ち込まない
 ための仕様でもあります。
 
 下記のテキスト形式ファイルは schema が安定しており、コピーしても安全です。
-**それ以外はそうではありません** —— Warp は Zap とは独立に進化しており、
+**それ以外はそうではありません** —— Warp は Warp とは独立に進化しており、
 バイナリ / プライベートストアは Warp の認証や bundle 識別子に紐付いている
 場合があります。
 
@@ -206,24 +206,24 @@ Zap が問題なく動くことを確認したら、上記の OpenWarp ディレ
   `~/Library/Application Support/dev.warp.Warp/`(Linux / Windows ではそれに
   相当する state ディレクトリ)にあるプライベートストアで、ユーザー設定・
   認証トークン・マシン依存 ID・クラウドキャッシュが混在しています。ファイル
-  ごとコピーすると ID 情報が漏れたり、Zap の認証状態が壊れたりします。
-  Zap のデフォルトはもともとプライバシー優先なので、**触らないでください**。
+  ごとコピーすると ID 情報が漏れたり、Warp の認証状態が壊れたりします。
+  Warp のデフォルトはもともとプライバシー優先なので、**触らないでください**。
 - **`warp.sqlite`**(および `-wal` / `-shm` のサイドカー)—— schema が上流
-  Warp に結合しており、Zap の migration が通る保証はありません。
+  Warp に結合しており、Warp の migration が通る保証はありません。
 - **Keychain / DPAPI / libsecret のエントリ** —— Warp の bundle / service 名に
-  紐付いており、Zap からは利用できません。
+  紐付いており、Warp からは利用できません。
 
 ### 手順
 
-> コピー前に **Warp と Zap を終了**してください。
+> コピー前に **Warp と Warp を終了**してください。
 
 **macOS**
 
 ```sh
-mkdir -p "$HOME/.zap"
+mkdir -p "$HOME/.warp"
 for f in settings.toml keybindings.yaml themes workflows launch_configurations tab_configs skills .mcp.json; do
-  if [ -e "$HOME/.warp/$f" ] && [ ! -e "$HOME/.zap/$f" ]; then
-    cp -R "$HOME/.warp/$f" "$HOME/.zap/$f"
+  if [ -e "$HOME/.warp/$f" ] && [ ! -e "$HOME/.warp/$f" ]; then
+    cp -R "$HOME/.warp/$f" "$HOME/.warp/$f"
   fi
 done
 ```
@@ -235,9 +235,9 @@ src_config="${XDG_CONFIG_HOME:-$HOME/.config}/warp-terminal"
 src_data="${XDG_DATA_HOME:-$HOME/.local/share}/warp-terminal"
 src_home="$HOME/.warp"
 
-dst_config="${XDG_CONFIG_HOME:-$HOME/.config}/zap"
-dst_data="${XDG_DATA_HOME:-$HOME/.local/share}/zap"
-dst_home="$HOME/.zap"
+dst_config="${XDG_CONFIG_HOME:-$HOME/.config}/warp"
+dst_data="${XDG_DATA_HOME:-$HOME/.local/share}/warp"
+dst_home="$HOME/.warp"
 mkdir -p "$dst_config" "$dst_data" "$dst_home"
 
 copy() {
@@ -263,9 +263,9 @@ $src_config = "$env:LOCALAPPDATA\warp\Warp-Terminal\config"
 $src_data   = "$env:APPDATA\warp\Warp-Terminal\data"
 $src_home   = "$env:USERPROFILE\.warp"
 
-$dst_config = "$env:LOCALAPPDATA\zap\Zap\config"
-$dst_data   = "$env:APPDATA\zap\Zap\data"
-$dst_home   = "$env:USERPROFILE\.zap"
+$dst_config = "$env:LOCALAPPDATA\warp\Warp\config"
+$dst_data   = "$env:APPDATA\warp\Warp\data"
+$dst_home   = "$env:USERPROFILE\.warp"
 New-Item -ItemType Directory -Force -Path $dst_config, $dst_data, $dst_home | Out-Null
 
 function Copy-IfMissing($srcDir, $dstDir, $name) {
@@ -292,37 +292,37 @@ Warp 自体のデータは一切手を加えません —— Warp 本体はそ�
 
 ## 確認方法
 
-Zap を起動すると、テーマピッカーにカスタムテーマ、キーバインドエディタに
+Warp を起動すると、テーマピッカーにカスタムテーマ、キーバインドエディタに
 カスタムキーバインド、ワークフローランチャーにカスタムワークフローが見える
 はずです。`settings.toml` に存在するキーは、設定 UI 上でも移行元の値が反映
 されます。
 
 うまく反映されない場合、原因は上記 8 ファイルのいずれかに含まれています ——
-テキストエディタで開いて確認するか、削除して Zap のデフォルトに戻して
+テキストエディタで開いて確認するか、削除して Warp のデフォルトに戻して
 ください。
 
 ## ロールバック
 
-本書の操作はいずれも破壊的ではありません。コピーしたファイルはどれも Zap が
+本書の操作はいずれも破壊的ではありません。コピーしたファイルはどれも Warp が
 起動時にデフォルトから再生成できるものです。すべてを元に戻すには:
 
 ```sh
 # macOS
-rm -rf ~/.zap
+rm -rf ~/.warp
 ```
 
 ```sh
 # Linux
-rm -rf "${XDG_CONFIG_HOME:-$HOME/.config}/zap"
-rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/zap"
-rm -rf "$HOME/.zap"
+rm -rf "${XDG_CONFIG_HOME:-$HOME/.config}/warp"
+rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/warp"
+rm -rf "$HOME/.warp"
 ```
 
 ```powershell
 # Windows
-Remove-Item -Recurse -Force "$env:APPDATA\zap"
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\zap"
-Remove-Item -Recurse -Force "$env:USERPROFILE\.zap"
+Remove-Item -Recurse -Force "$env:APPDATA\warp"
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\warp"
+Remove-Item -Recurse -Force "$env:USERPROFILE\.warp"
 ```
 
 OpenWarp および Warp のソースディレクトリは、いずれも本ガイドからは変更されません。

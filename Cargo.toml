@@ -492,7 +492,7 @@ inherits = "release-lto-debug_assertions"
 
 # Local iteration profile: optimized but no LTO, many codegen units and incremental
 # compilation, so rebuilds after small edits take minutes rather than tens of minutes.
-# Build with `cargo build --profile fast --bin warp-oss --features release_bundle,gui`.
+# Build with `cargo build --profile fast --bin warp --features release_bundle,gui`.
 [profile.fast]
 inherits = "release"
 lto = "off"

@@ -1,6 +1,6 @@
 [package]
 authors = ["Warp Team"]
-default-run = "warp-oss"
+default-run = "warp"
 description = "The local-first agentic terminal"
 edition = "2021"
 autobins = false
@@ -13,11 +13,11 @@ license.workspace = true
 name = "warp"
 path = "src/lib.rs"
 
-# Warp 只保留两个 bin:打包用的 warp-oss,以及构建期工具 generate_settings_schema。
+# Warp 只保留两个 bin:打包用的 warp,以及构建期工具 generate_settings_schema。
 # 原 warp 多渠道发布的 dev/stable/preview/local bin 已删除。
 
 [[bin]]
-name = "warp-oss"
+name = "warp"
 path = "src/bin/warp_oss.rs"
 test = false
 
@@ -838,7 +838,7 @@ hoa_remote_control = []
 codex_notifications = []
 configurable_context_window = []
 
-[package.metadata.bundle.bin.warp-oss]
+[package.metadata.bundle.bin.warp]
 category = "public.app-category.developer-tools"
 copyright = "© 2025-2026, Warp"
 identifier = "dev.warp.Warp"

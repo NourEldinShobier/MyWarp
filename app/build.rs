@@ -119,9 +119,9 @@ fn main() -> Result<()> {
         if target_env == "msvc"
             && env::var("CARGO_FEATURE_WINDOWS_HIGH_PERFORMANCE_GPU_DEFAULT").is_ok()
         {
-            println!("cargo:rustc-link-arg-bin=warp-oss=/EXPORT:NvOptimusEnablement,DATA");
+            println!("cargo:rustc-link-arg-bin=warp=/EXPORT:NvOptimusEnablement,DATA");
             println!(
-                "cargo:rustc-link-arg-bin=warp-oss=/EXPORT:AmdPowerXpressRequestHighPerformance,DATA"
+                "cargo:rustc-link-arg-bin=warp=/EXPORT:AmdPowerXpressRequestHighPerformance,DATA"
             );
         }
 
