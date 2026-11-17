@@ -1401,15 +1401,9 @@ fn initialize_app(
 
     #[cfg(feature = "local_fs")]
     {
-        let imported_config_model = ctx.add_singleton_model(ImportedConfigModel::new);
-
-        if FeatureFlag::SettingsImport.is_enabled()
-            && ChannelState::channel() != warp_core::channel::Channel::Integration
-        {
-            imported_config_model.update(ctx, |model, ctx| {
-                model.search_for_settings_to_import(ctx);
-            });
-        }
+        // The settings-import scan (and its system font scan) starts lazily when the
+        // import onboarding block is shown; see TerminalView::add_settings_import_block.
+        ctx.add_singleton_model(ImportedConfigModel::new);
 
         ctx.add_singleton_model(|ctx| {
             let model = RepoMetadataModel::new(ctx);
@@ -2193,13 +2187,19 @@ fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode
     match &launch_mode {
         LaunchMode::App { .. } | LaunchMode::Test { .. } => {
             // Attempt to restore windows from the persisted application state.
-            let arg = OpenFromRestoredArg { app_state };
+            let urls = &launch_mode.args().urls;
+            // A lone `new_window?path=` URL opens its own window when nothing was restored,
+            // so skip the fallback default window (it would start a second shell).
+            let skip_default_window = uri::should_reuse_restored_window(true, urls);
+            let arg = OpenFromRestoredArg {
+                app_state,
+                skip_default_window,
+            };
             ctx.dispatch_global_action("root_view:open_from_restored", &arg);
 
             // Process any URLs that were provided on the command line (which may be
             // file:// URLs or ones using our custom URL scheme). A lone
             // `new_window?path=` URL reuses the restored window as a new tab.
-            let urls = &launch_mode.args().urls;
             let reuse_restored_window =
                 uri::should_reuse_restored_window(ctx.window_ids().count() > 0, urls);
             let startup_urls_start = std::time::Instant::now();

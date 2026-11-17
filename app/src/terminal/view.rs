@@ -11957,6 +11957,14 @@ impl TerminalView {
     #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
     fn add_settings_import_block(&mut self, ctx: &mut ViewContext<Self>) {
         self.block_onboarding_active = true;
+        #[cfg(feature = "local_fs")]
+        if crate::features::FeatureFlag::SettingsImport.is_enabled() {
+            crate::settings::import::model::ImportedConfigModel::handle(ctx).update(ctx, |model, ctx| {
+                if !model.is_started() {
+                    model.search_for_settings_to_import(ctx);
+                }
+            });
+        }
         let current_block_view_handle = ctx.add_typed_action_view(SettingsImportView::new);
         self.settings_import_onboarding_block = Some(current_block_view_handle.clone());
 

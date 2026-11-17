@@ -47,13 +47,7 @@ impl ImportedConfigModel {
     pub fn search_for_settings_to_import(&mut self, ctx: &mut ModelContext<Self>) {
         self.started = true;
 
-        // Delay the system font scan so it doesn't compete with startup.
-        ctx.spawn(
-            async {
-                warpui::r#async::Timer::after(std::time::Duration::from_secs(8)).await;
-            },
-            |_, _, ctx| Self::scan_fonts_and_parse(ctx),
-        );
+        Self::scan_fonts_and_parse(ctx);
     }
 
     #[cfg(feature = "local_fs")]
