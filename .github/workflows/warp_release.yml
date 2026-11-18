@@ -173,13 +173,6 @@ jobs:
         run: rustup target add ${{ matrix.arch }}-apple-darwin
         shell: bash
 
-      - name: Check ${{ matrix.arch }} release compile
-        run: |
-          script/bundle --check-only --channel "$CHANNEL" --arch ${{ matrix.arch }} --dmg-name-suffix "${{ matrix.dmg_name_suffix }}" --selfsign
-        shell: bash
-        env:
-          GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
-
       - name: Setup Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
@@ -214,30 +207,6 @@ jobs:
         with:
           name: warp-macos-${{ matrix.dmg_name_suffix }}
           path: ${{ steps.bundle_app.outputs.dmg_path }}
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Build CLI
-        id: bundle_cli
-        run: |
-          script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --artifact cli --nosign
-        shell: bash
-        env:
-          GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
-
-      - name: Package CLI tarball
-        run: |
-          cp "${{ steps.bundle_cli.outputs.binary_path }}" warp
-          tar czf warp-macos-${{ matrix.arch }}.tar.gz \
-            warp \
-            -C "$(dirname "${{ steps.bundle_cli.outputs.bundled_resources_dir }}")" resources
-        shell: bash
-
-      - name: Upload CLI artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: warp-cli-macos-${{ matrix.arch }}
-          path: warp-macos-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
           retention-days: 7
 
