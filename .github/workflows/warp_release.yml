@@ -132,6 +132,8 @@ jobs:
             echo
             cat release-notes.md
           } > release-body.md
+          # GitHub rejects release bodies over 125000 chars
+          head -c 100000 release-body.md > release-body.tmp && mv release-body.tmp release-body.md
           echo "---- release-body.md ----"
           cat release-body.md
 
