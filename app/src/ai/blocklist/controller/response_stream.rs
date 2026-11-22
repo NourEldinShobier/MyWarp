@@ -76,6 +76,50 @@ pub(crate) struct TitleGenParams {
     pub extra_headers: Vec<(String, String)>,
 }
 
+/// Dispatch info for `cli:` models (Claude Code and other CLI backends).
+struct CliDispatch {
+    backend: &'static dyn crate::ai::cli_agents::AgentBackend,
+    model: Option<String>,
+    task_id: String,
+    needs_create_task: bool,
+}
+
+fn cli_dispatch_info(
+    params: &api::RequestParams,
+    ai_identifiers: &AIIdentifiers,
+    ctx: &warpui::AppContext,
+) -> Option<CliDispatch> {
+    let (backend, model) = crate::ai::cli_agents::decode_model_id(params.model.as_str())?;
+    let conversation_id = ai_identifiers.client_conversation_id.as_ref()?;
+    let conversation = BlocklistAIHistoryModel::as_ref(ctx).conversation(conversation_id)?;
+    Some(CliDispatch {
+        backend,
+        model,
+        task_id: params
+            .byop_target_task_id
+            .clone()
+            .unwrap_or_else(|| conversation.get_root_task_id().to_string()),
+        needs_create_task: conversation.compute_active_tasks().is_empty(),
+    })
+}
+
+fn cli_response_stream(
+    cli: CliDispatch,
+    params: api::RequestParams,
+    cancellation_rx: oneshot::Receiver<()>,
+) -> Result<api::ResponseStream, ConvertToAPITypeError> {
+    Ok(crate::ai::cli_agents::stream::generate_cli_output(
+        crate::ai::cli_agents::stream::CliTurnInput {
+            params,
+            backend: cli.backend,
+            model: cli.model,
+            task_id: cli.task_id,
+            needs_create_task: cli.needs_create_task,
+            cancellation_rx,
+        },
+    ))
+}
+
 fn byop_dispatch_info(
     params: &api::RequestParams,
     ai_identifiers: &AIIdentifiers,
@@ -294,13 +338,16 @@ impl ResponseStream {
         // BYOP 路径: 若选中的 base model 是用户自定义 provider 编码的 LLMId,
         // 则在 spawn 前从 ctx 中取出 (provider, api_key, model_id, root_task_id),
         // 走自定义 chat completions。否则走 warp 自家 multi-agent 端点(原有路径)。
+        let cli_dispatch = cli_dispatch_info(&params, &ai_identifiers, ctx);
         let byop_dispatch = byop_dispatch_info(&params, &ai_identifiers, ctx);
         let pending_title_generation = byop_dispatch
             .as_ref()
             .and_then(|byop| pending_title_generation_from_byop(&params, byop));
         let _ = ctx.spawn(
             async move {
-                if let Some(byop) = byop_dispatch {
+                if let Some(cli) = cli_dispatch {
+                    cli_response_stream(cli, params_clone, cancellation_rx)
+                } else if let Some(byop) = byop_dispatch {
                     crate::ai::agent_providers::chat_stream::generate_byop_output(
                         crate::ai::agent_providers::chat_stream::ByopOutputInput {
                             params: params_clone,
@@ -406,10 +453,13 @@ impl ResponseStream {
         let request_id = Uuid::new_v4();
         self.current_request_id = Some(request_id);
         let params = self.params.clone();
+        let cli_dispatch = cli_dispatch_info(&params, &self.ai_identifiers, ctx);
         let byop_dispatch = byop_dispatch_info(&params, &self.ai_identifiers, ctx);
         let _ = ctx.spawn(
             async move {
-                if let Some(byop) = byop_dispatch {
+                if let Some(cli) = cli_dispatch {
+                    cli_response_stream(cli, params, cancellation_rx)
+                } else if let Some(byop) = byop_dispatch {
                     crate::ai::agent_providers::chat_stream::generate_byop_output(
                         crate::ai::agent_providers::chat_stream::ByopOutputInput {
                             params,

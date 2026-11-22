@@ -4769,12 +4769,12 @@ fn sanitize_title(raw: &str) -> Option<String> {
 // Event 构造辅助
 // ---------------------------------------------------------------------------
 
-enum AppendKind {
+pub(crate) enum AppendKind {
     Reasoning(String),
     Text(String),
 }
 
-fn make_add_messages_event(task_id: &str, messages: Vec<api::Message>) -> api::ResponseEvent {
+pub(crate) fn make_add_messages_event(task_id: &str, messages: Vec<api::Message>) -> api::ResponseEvent {
     api::ResponseEvent {
         r#type: Some(api::response_event::Type::ClientActions(
             api::response_event::ClientActions {
@@ -4817,7 +4817,7 @@ fn make_update_message_event(
     }
 }
 
-fn make_append_event(task_id: &str, message_id: &str, kind: AppendKind) -> api::ResponseEvent {
+pub(crate) fn make_append_event(task_id: &str, message_id: &str, kind: AppendKind) -> api::ResponseEvent {
     let (msg_inner, mask_path) = match kind {
         AppendKind::Reasoning(r) => (
             api::message::Message::AgentReasoning(api::message::AgentReasoning {
@@ -4964,7 +4964,7 @@ fn parse_incoming_tool_call(
     }
 }
 
-fn make_reasoning_message(task_id: &str, request_id: &str, reasoning: String) -> api::Message {
+pub(crate) fn make_reasoning_message(task_id: &str, request_id: &str, reasoning: String) -> api::Message {
     api::Message {
         id: Uuid::new_v4().to_string(),
         task_id: task_id.to_owned(),
@@ -4981,7 +4981,7 @@ fn make_reasoning_message(task_id: &str, request_id: &str, reasoning: String) ->
     }
 }
 
-fn make_agent_output_message(task_id: &str, request_id: &str, text: String) -> api::Message {
+pub(crate) fn make_agent_output_message(task_id: &str, request_id: &str, text: String) -> api::Message {
     api::Message {
         id: Uuid::new_v4().to_string(),
         task_id: task_id.to_owned(),
@@ -4995,7 +4995,7 @@ fn make_agent_output_message(task_id: &str, request_id: &str, text: String) -> a
     }
 }
 
-fn make_user_query_message(
+pub(crate) fn make_user_query_message(
     task_id: &str,
     request_id: &str,
     query: String,
@@ -5304,7 +5304,7 @@ fn make_tool_call_carrier_message(
     }
 }
 
-fn make_tool_call_message(
+pub(crate) fn make_tool_call_message(
     task_id: &str,
     request_id: &str,
     tool_call_id: &str,
@@ -5324,7 +5324,7 @@ fn make_tool_call_message(
     }
 }
 
-fn create_task_event(task_id: &str) -> api::ResponseEvent {
+pub(crate) fn create_task_event(task_id: &str) -> api::ResponseEvent {
     api::ResponseEvent {
         r#type: Some(api::response_event::Type::ClientActions(
             api::response_event::ClientActions {
@@ -5377,7 +5377,7 @@ fn create_subtask_event(subtask_id: &str, parent_task_id: &str) -> api::Response
     }
 }
 
-fn make_finished_done(
+pub(crate) fn make_finished_done(
     usage_metadata: Option<api::response_event::stream_finished::ConversationUsageMetadata>,
 ) -> api::ResponseEvent {
     api::ResponseEvent {

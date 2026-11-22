@@ -688,6 +688,34 @@ impl BlocklistAIActionModel {
         }
     }
 
+    /// Records the outcome of a tool an external CLI agent already ran. Display only: the
+    /// action is never queued, and the result is not sent back to a model.
+    pub(super) fn record_display_only_result(
+        &mut self,
+        outcome: crate::ai::cli_agents::ToolOutcome,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let crate::ai::cli_agents::ToolOutcome { tool_call_id, task_id, is_error, output } = outcome;
+        use crate::ai::agent::CallMCPToolResult;
+        let result = if is_error {
+            CallMCPToolResult::Error(output)
+        } else {
+            CallMCPToolResult::Success {
+                result: rmcp::model::CallToolResult::success(vec![rmcp::model::Content::text(output)]),
+            }
+        };
+        let id = AIAgentActionId::from(tool_call_id);
+        self.past_action_results.insert(
+            id.clone(),
+            Arc::new(AIAgentActionResult {
+                id,
+                task_id: crate::ai::agent::task::TaskId::new(task_id),
+                result: AIAgentActionResultType::CallMCPTool(result),
+            }),
+        );
+        ctx.notify();
+    }
+
     /// Attempts to execute the next pending action for the active conversation.
     pub fn execute_next_action_for_user(
         &mut self,

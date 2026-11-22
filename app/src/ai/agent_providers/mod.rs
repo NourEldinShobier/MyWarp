@@ -118,6 +118,33 @@ fn build_byop_llm_infos(app: &AppContext) -> Vec<LLMInfo> {
         }
     }
 
+    out.extend(cli_llm_infos());
+    out
+}
+
+/// Picker entries for every installed CLI backend (`cli:<backend>/<model>`).
+fn cli_llm_infos() -> Vec<LLMInfo> {
+    let mut out = Vec::new();
+    for backend in crate::ai::cli_agents::backends().iter().filter(|b| crate::ai::cli_agents::is_installed(**b)) {
+        for model in backend.models() {
+            let name = format!("{} / {model}", backend.display_name());
+            out.push(LLMInfo {
+                display_name: name.clone(),
+                base_model_name: name,
+                id: ai::LLMId::from(crate::ai::cli_agents::encode_model_id(backend.id(), model)),
+                reasoning_level: None,
+                usage_metadata: LLMUsageMetadata { request_multiplier: 1, credit_multiplier: None },
+                description: Some("Runs through your installed CLI and its login".to_owned()),
+                disable_reason: None,
+                vision_supported: false,
+                spec: None,
+                provider: LLMProvider::Unknown,
+                host_configs: HashMap::new(),
+                discount_percentage: None,
+                context_window: LLMContextWindow::default(),
+            });
+        }
+    }
     out
 }
 

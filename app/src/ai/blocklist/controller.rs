@@ -3454,6 +3454,16 @@ impl BlocklistAIController {
                     }
                 };
 
+                // Results of tools an external CLI agent ran this turn (display only).
+                let cli_outcomes = crate::ai::cli_agents::drain_outcomes();
+                if !cli_outcomes.is_empty() {
+                    self.action_model.update(ctx, |action_model, ctx| {
+                        for o in cli_outcomes {
+                            action_model.record_display_only_result(o, ctx);
+                        }
+                    });
+                }
+
                 let history_model = BlocklistAIHistoryModel::handle(ctx);
                 let Some(conversation) = history_model.as_ref(ctx).conversation(&conversation_id)
                 else {
@@ -3484,7 +3494,14 @@ impl BlocklistAIController {
                         ..
                     } = &exchange.output_status
                     {
-                        actions_to_queue.extend(output.get().actions().cloned());
+                        // Tools an external CLI agent already ran are shown, never executed.
+                        actions_to_queue.extend(
+                            output
+                                .get()
+                                .actions()
+                                .filter(|a| !crate::ai::cli_agents::is_display_only(&a.id.to_string()))
+                                .cloned(),
+                        );
                     }
                 }
 
