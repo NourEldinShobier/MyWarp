@@ -1,5 +1,5 @@
-//! SSH 连接成功后自动执行启动命令。等待 shell prompt 出现后,
-//! 将 startup_command 写入 PTY + `\n`,一次性注入后退出。
+//! Automatically runs the startup command after the SSH connection succeeds. Waits for the shell prompt to appear,
+//! then writes startup_command to the PTY + `\n`, injecting it once and exiting.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,7 +15,7 @@ const INJECT_TIMEOUT: Duration = Duration::from_secs(30);
 const SLIDING_WINDOW_BYTES: usize = 8 * 1024;
 const BUFFER_HARD_LIMIT: usize = 16 * 1024;
 
-/// 在 owner 上下文 spawn 启动命令注入任务。
+/// Spawn the startup command injection task in the owner context.
 pub fn spawn_startup_command_injector<O>(
     pty_reads_rx: Option<InactiveReceiver<Arc<Vec<u8>>>>,
     terminal_view: WeakViewHandle<TerminalView>,

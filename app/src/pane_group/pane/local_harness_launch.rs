@@ -125,9 +125,9 @@ pub(super) async fn prepare_local_harness_child_launch(
         Harness::Gemini => unreachable!("normalize_local_child_harness filters out Gemini"),
     };
 
-    // Warp(本地化,Phase 3b-4):本地 harness 启动子 task 不再走云端
-    // `create_agent_task` mutation,直接本地生成 UUID v4 作为 task_id。
-    // `local_child_task_config(harness)` 参数不再使用。
+    // Warp (localization, Phase 3b-4): launching a child task for a local harness no longer goes through the cloud
+    // `create_agent_task` mutation; a UUID v4 is generated locally as the task_id.
+    // The `local_child_task_config(harness)` parameter is no longer used.
     let _ = local_child_task_config(harness);
     let task_id = AmbientAgentTaskId::new_local();
 

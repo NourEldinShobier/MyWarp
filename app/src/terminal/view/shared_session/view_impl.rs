@@ -169,8 +169,8 @@ impl TerminalView {
         // still runs; it just doesn't surface a "share" button in the header.
     }
 
-    // Warp:Share Session 路径已切断,下面两个方法保留签名但 no-op,
-    // 不再 emit `Event::OpenShareSessionModal{,DeniedModal}`,也不再触达云端协同会话服务。
+    // Warp: the Share Session path is cut off; the next two methods keep their signatures but are no-ops,
+    // no longer emit `Event::OpenShareSessionModal{,DeniedModal}`, and no longer reach the cloud collaboration session service.
     pub fn open_share_session_modal(
         &mut self,
         _open_source: SharedSessionActionSource,
@@ -206,8 +206,8 @@ impl TerminalView {
     /// 5. Once the session is registered with [`shared_session::manager::Manager`], it
     ///    will emit an event for relevant subscribers (e.g. the Workspace will need to
     ///    re-render when a share starts for tab indicator, share button, etc.)
-    // Warp:Shared Session 网络入口已切断,attempt_to_share_session 整体 no-op,
-    // 不再 set SharePending 状态、不再 emit StartSharingCurrentSession、不再触发遥测。
+    // Warp: the Shared Session network entry point is cut off; attempt_to_share_session is a full no-op,
+    // no longer sets the SharePending state, emits StartSharingCurrentSession, or fires telemetry.
     pub fn attempt_to_share_session(
         &mut self,
         _scrollback_type: SharedSessionScrollbackType,
@@ -229,9 +229,9 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         let started_at = Local::now();
-        // TODO(warp-cloud-removal Phase 5): `self_handle` 原本喂给 ShareableObject::Session
-        // 用于 sharing UI 反查 pane;sharing UI 已删但 shared_session 整条链路仍在,
-        // 完整退役 shared_session 时再删这个 ctx.handle() 调用。
+        // TODO(warp-cloud-removal Phase 5): `self_handle` was originally fed to ShareableObject::Session
+        // so the sharing UI could look up the pane; the sharing UI is deleted but the whole shared_session chain remains,
+        // remove this ctx.handle() call when shared_session is fully retired.
         let _self_handle = ctx.handle();
         let adapter = Adapter::new_for_sharer(
             sharer_id,
@@ -294,9 +294,9 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         let started_at = Local::now();
-        // TODO(warp-cloud-removal Phase 5): `self_handle` 原本喂给 ShareableObject::Session
-        // 用于 sharing UI 反查 pane;sharing UI 已删但 shared_session 整条链路仍在,
-        // 完整退役 shared_session 时再删这个 ctx.handle() 调用。
+        // TODO(warp-cloud-removal Phase 5): `self_handle` was originally fed to ShareableObject::Session
+        // so the sharing UI could look up the pane; the sharing UI is deleted but the whole shared_session chain remains,
+        // remove this ctx.handle() call when shared_session is fully retired.
         let _self_handle = ctx.handle();
         let adapter = Adapter::new_for_viewer(
             viewer_id.clone(),

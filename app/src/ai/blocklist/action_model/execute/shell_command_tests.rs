@@ -46,10 +46,10 @@ fn does_not_detect_unrelated_or_non_interactive_ssh_commands() {
         "warp_run_generator_command 42 'ssh user@host ls'",
         "Warp-Run-GeneratorCommand 42 'git status' -ErrorAction Ignore",
         "rsync myfile.txt ssh://user@server.com",
-        // 右引号后还粘着字符,故意拒绝 tokenize,避免被错切成 `ssh`
-        // 然后通过 `ssh hello-world` 误判为交互会话。
+        // A character stuck right after the closing quote is deliberately rejected by tokenize, to avoid being mis-split into `ssh`
+        // and then misjudged as an interactive session via `ssh hello-world`.
         r#""ssh"hello-world"#,
-        // 未闭合的引号同样拒绝 tokenize。
+        // An unclosed quote is likewise rejected by tokenize.
         r#""ssh hello world"#,
     ] {
         assert_eq!(
@@ -132,7 +132,7 @@ fn preemption_logic_covers_until_completion_timeout() {
     use ActionResultDelay::{Default, Duration as DurationDelay, OnCompletion, UntilCompletion};
     use WakeReason::*;
 
-    // BlockFinished 从不抢占 —— 它是“命令真正完成”的信号。
+    // BlockFinished never preempts - it is the signal that the command has truly finished.
     assert!(!compute_is_preempted(BlockFinished, UntilCompletion));
     assert!(!compute_is_preempted(BlockFinished, Default));
     assert!(!compute_is_preempted(
@@ -142,21 +142,21 @@ fn preemption_logic_covers_until_completion_timeout() {
         }
     ));
 
-    // ForceRefresh 总是抢占,与 delay 无关。
+    // ForceRefresh always preempts, regardless of delay.
     assert!(compute_is_preempted(ForceRefresh, UntilCompletion));
     assert!(compute_is_preempted(ForceRefresh, Default));
 
-    // Timeout + OnCompletion / UntilCompletion 是抢占。
+    // Timeout + OnCompletion / UntilCompletion preempt.
     assert!(compute_is_preempted(
         Timeout,
         OnCompletion {
             timeout: Duration::from_secs(1)
         }
     ));
-    // #138: pager 卡死兜底超时必须被标记为抢占,避免 server 误解为“命令完成”。
+    // #138: the pager-stuck fallback timeout must be marked as preempting, so the server does not read it as "command finished".
     assert!(compute_is_preempted(Timeout, UntilCompletion));
 
-    // Timeout + Default / Duration 不是抢占 —— agent 本来就预期会拿到中间快照。
+    // Timeout + Default / Duration do not preempt - the agent expects to get intermediate snapshots.
     assert!(!compute_is_preempted(Timeout, Default));
     assert!(!compute_is_preempted(
         Timeout,
@@ -164,8 +164,8 @@ fn preemption_logic_covers_until_completion_timeout() {
     ));
 }
 
-/// 复现挂死案例:heredoc 结束符必须保持独占一行,闭合 `)` 不能被拼到它后面。
-/// 拼成 `PY)` 后 shell 永远等不到结束符,停在 PS2 上,命令永不结束。
+/// Reproduces the hang case: the heredoc terminator must stay alone on its line, and the closing `)` must not be appended after it.
+/// If it becomes `PY)`, the shell never sees the terminator, stays at PS2, and the command never ends.
 #[test]
 fn multiline_heredoc_keeps_delimiter_and_closer_on_their_own_lines() {
     let command = "python3 - <<'PY'\nprint('ok')\nPY";
@@ -177,14 +177,14 @@ fn multiline_heredoc_keeps_delimiter_and_closer_on_their_own_lines() {
         assert_eq!(
             lines[lines.len() - 2],
             "PY",
-            "heredoc 结束符被污染: {wrapped}"
+            "heredoc terminator corrupted: {wrapped}"
         );
-        assert_eq!(lines[lines.len() - 1], ")", "闭合括号未独占一行: {wrapped}");
-        assert!(wrapped.contains("PAGER=cat"), "pager 抑制丢失: {wrapped}");
+        assert_eq!(lines[lines.len() - 1], ")", "closing paren not alone on its line: {wrapped}");
+        assert!(wrapped.contains("PAGER=cat"), "pager suppression lost: {wrapped}");
     }
 }
 
-/// 同一类破绽:命令以尾随 `#` 注释结尾时,闭合 token 会被注释掉。
+/// Same class of flaw: when a command ends with a trailing `#` comment, the closing token gets commented out.
 #[test]
 fn multiline_trailing_comment_does_not_swallow_closer() {
     let command = "echo start\necho done # 收尾";
@@ -194,8 +194,8 @@ fn multiline_trailing_comment_does_not_swallow_closer() {
     assert!(wrap_command_without_pager(Some(ShellType::PowerShell), command).ends_with("\n}"));
 }
 
-/// 单行命令必须保持原有的单行形态:`bytes_to_execute_command` 在不支持 bracketed
-/// paste 的 shell 上会把 `\n` 换成 `\r`,多加换行会把一条命令拆成多个 block。
+/// A single-line command must keep its original single-line form: on shells that do not support bracketed
+/// paste, `bytes_to_execute_command` turns `\n` into `\r`, and extra newlines would split one command into several blocks.
 #[test]
 fn single_line_command_stays_on_one_line() {
     let command = "cargo check";
@@ -209,13 +209,13 @@ fn single_line_command_stays_on_one_line() {
         let wrapped = wrap_command_without_pager(Some(shell), command);
         assert!(
             !wrapped.contains('\n'),
-            "{shell:?} 单行命令被拆行: {wrapped}"
+            "{shell:?} single-line command was split: {wrapped}"
         );
-        assert!(wrapped.contains(command), "{shell:?} 命令丢失: {wrapped}");
+        assert!(wrapped.contains(command), "{shell:?} command lost: {wrapped}");
     }
 }
 
-/// 未知 shell 无法安全装饰,原样放过。
+/// An unknown shell cannot be safely decorated; pass it through unchanged.
 #[test]
 fn unknown_shell_passes_command_through() {
     let command = "python3 - <<'PY'\nprint('ok')\nPY";

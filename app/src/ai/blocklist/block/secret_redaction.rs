@@ -207,7 +207,7 @@ impl SecretRedactionState {
         }
     }
 
-    /// 清理所有 output 位置的脱敏结果，保留 query 的脱敏状态。
+    /// Clears the redaction results at all output positions, keeping the query's redaction state.
     pub fn clear_output_locations(&mut self) {
         self.detected_secrets
             .retain(|location, _| !matches!(location, TextLocation::Output { .. }));
@@ -323,7 +323,7 @@ impl SecretRedactionState {
         }
     }
 
-    /// 从指定的渲染 section 起点扫描一组 output sections，并返回参与索引累计的 section 数。
+    /// Scans a group of output sections from the given render section start, and returns the number of sections that contribute to the index accumulation.
     pub(crate) fn run_redaction_on_text_sections_with_starting_section_index(
         &mut self,
         sections: &[AIAgentTextSection],
@@ -358,7 +358,7 @@ impl SecretRedactionState {
         sections.len()
     }
 
-    /// 从指定的渲染 section 起点扫描完整 output，并返回参与索引累计的 section 数。
+    /// Scans the full output from the given render section start, and returns the number of sections that contribute to the index accumulation.
     pub(crate) fn run_redaction_on_output_with_starting_section_index(
         &mut self,
         output: &AIAgentOutput,
@@ -719,7 +719,7 @@ pub(crate) fn redact_secrets_in_element<T: PartialClickableElement>(
                 SECRET_REDACTION_REPLACEMENT_CHARACTER
                     .repeat(
                         // Use character range length here! Even wide characters should be replaced by a single *, in rich content
-                        // block secret redaction e.g. 码1234 -> *1234 not **1234.
+                        // block secret redaction e.g. <wide char>1234 -> *1234 not **1234.
                         detected_secret_range.char_range.end
                             - detected_secret_range.char_range.start,
                     )

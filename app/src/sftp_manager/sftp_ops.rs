@@ -1,6 +1,6 @@
-//! SFTP 操作封装层
+//! SFTP operations wrapper layer
 //!
-//! 将 warp_sftp 协议层 API 封装为 UI 层可直接使用的高级操作。
+//! Wraps the warp_sftp protocol-layer API into high-level operations the UI layer can use directly.
 //! author: logic
 //! date: 2026-05-26
 
@@ -19,23 +19,23 @@ use warp_sftp::types::OpenOptions;
 
 use super::types::{FileEntry, FileEntryType};
 
-/// SFTP 操作错误
+/// SFTP operation error
 #[derive(Debug)]
 pub enum SftpOpsError {
-    /// 连接错误
+    /// Connection error
     Connection(String),
-    /// 操作错误
+    /// Operation error
     Operation(String),
-    /// 本地 IO 错误
+    /// Local IO error
     LocalIo(String),
-    /// 未找到凭据
+    /// Credentials not found
     NoCredentials(String),
-    /// 传输已取消
+    /// Transfer cancelled
     Cancelled,
 }
 
-/// `Display` 保持稳定的英文形式,给 log / `anyhow` 链使用 —— 日志不随 UI 语言变化,
-/// 便于跨 locale 检索。面向用户的文案走 [`SftpOpsError::localized`]。
+/// `Display` stays in a stable English form for log / `anyhow` chains -- logs do not change with the UI language,
+/// which makes searching across locales easier. User-facing text goes through [`SftpOpsError::localized`].
 impl std::fmt::Display for SftpOpsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -49,10 +49,10 @@ impl std::fmt::Display for SftpOpsError {
 }
 
 impl SftpOpsError {
-    /// 按当前 UI locale 渲染错误文案。toast / 连接状态等用户可见位置一律用这个,
-    /// 不要用 `to_string()`(那是英文 log 形式)。
+    /// Renders the error text in the current UI locale. Toasts, connection status and other user-visible places should always use this,
+    /// not `to_string()` (that is the English log form).
     ///
-    /// 内层 `msg` 由底层 `warp_sftp` 协议层拼出,仍是英文;此处本地化的是错误类别前缀。
+    /// The inner `msg` is built by the underlying `warp_sftp` protocol layer and is still English; what gets localized here is the error category prefix.
     pub fn localized(&self) -> String {
         match self {
             SftpOpsError::Connection(msg) => {
@@ -84,13 +84,13 @@ impl From<std::io::Error> for SftpOpsError {
     }
 }
 
-/// 进度回调类型
+/// Progress callback type
 pub type ProgressCallback = Box<dyn Fn(u64, u64) + Send>;
 
-/// 连接超时时间
+/// Connection timeout
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// 使用服务器配置建立 SFTP 连接
+/// Establish an SFTP connection using the server configuration
 pub fn connect_from_server(
     server: &SshServerInfo,
     secret_store: &dyn SshSecretStore,
@@ -112,7 +112,7 @@ fn resolve_sftp_auth(server: &SshServerInfo) -> Result<ResolvedSshAuth, SftpOpsE
         .map_err(|e| SftpOpsError::NoCredentials(format!("Failed to resolve credentials: {e}")))
 }
 
-/// 列出远程目录内容，转换为 UI 层 FileEntry
+/// List remote directory contents, converting them to UI-layer FileEntry
 pub fn list_dir(sftp: &Sftp, path: &Path) -> Result<Vec<FileEntry>, SftpOpsError> {
     let entries = sftp.read_dir(path)?;
     let result = entries
@@ -146,13 +146,13 @@ pub fn list_dir(sftp: &Sftp, path: &Path) -> Result<Vec<FileEntry>, SftpOpsError
     Ok(result)
 }
 
-/// 删除远程文件
+/// Delete a remote file
 pub fn delete_file(sftp: &Sftp, path: &Path) -> Result<(), SftpOpsError> {
     sftp.remove_file(path)?;
     Ok(())
 }
 
-/// 递归删除远程目录
+/// Recursively delete a remote directory
 pub fn delete_dir_recursive(sftp: &Sftp, path: &Path) -> Result<(), SftpOpsError> {
     let entries = sftp.read_dir(path)?;
     for entry in entries {
@@ -171,13 +171,13 @@ pub fn delete_dir_recursive(sftp: &Sftp, path: &Path) -> Result<(), SftpOpsError
     Ok(())
 }
 
-/// 创建远程目录
+/// Create a remote directory
 pub fn create_dir(sftp: &Sftp, path: &Path) -> Result<(), SftpOpsError> {
     sftp.create_dir(path)?;
     Ok(())
 }
 
-/// 重命名远程文件或目录
+/// Rename a remote file or directory
 pub fn rename(sftp: &Sftp, old_path: &Path, new_path: &Path) -> Result<(), SftpOpsError> {
     let opts = warp_sftp::types::RenameOptions {
         overwrite: false,
@@ -188,11 +188,11 @@ pub fn rename(sftp: &Sftp, old_path: &Path, new_path: &Path) -> Result<(), SftpO
     Ok(())
 }
 
-/// 流式上传本地文件到远程
+/// Stream-upload a local file to the remote
 ///
-/// 使用临时文件模式：先上传到 .sftp_partial 后缀的临时路径，
-/// 完成后 rename 到目标路径，取消或失败时清理临时文件，
-/// 避免截断已有远程文件导致数据丢失。
+/// Uses the temp-file pattern: upload first to a temp path with the .sftp_partial suffix,
+/// then rename to the target path when done; on cancel or failure the temp file is cleaned up,
+/// avoiding truncating an existing remote file and losing data.
 pub fn upload_file_streaming(
     sftp: &Sftp,
     local_path: &Path,
@@ -204,7 +204,7 @@ pub fn upload_file_streaming(
         fs::File::open(local_path).map_err(|e| SftpOpsError::LocalIo(e.to_string()))?;
     let total_size = local_file.metadata().map(|m| m.len()).unwrap_or(0);
 
-    // 使用临时路径上传，避免截断已有文件
+    // Upload via a temp path to avoid truncating an existing file
     let remote_display = remote_path.display();
     let temp_remote_path = PathBuf::from(format!("{remote_display}.sftp_partial"));
     let mut remote_file = sftp.open(&temp_remote_path, OpenOptions::write())?;
@@ -235,7 +235,7 @@ pub fn upload_file_streaming(
 
     match &result {
         Ok(()) => {
-            // 上传成功：rename 临时文件到目标路径
+            // Upload succeeded: rename the temp file to the target path
             let rename_result = sftp.rename(
                 &temp_remote_path,
                 remote_path,
@@ -246,7 +246,7 @@ pub fn upload_file_streaming(
                 },
             );
 
-            // 部分服务器不支持 OVERWRITE 标志，使用备份重命名策略避免数据丢失
+            // Some servers do not support the OVERWRITE flag; use a backup-rename strategy to avoid data loss
             let rename_result = match rename_result {
                 Ok(()) => Ok(()),
                 Err(_) => {
@@ -280,7 +280,7 @@ pub fn upload_file_streaming(
                             Ok(())
                         }
                         Err(e) => {
-                            // 重命名失败：恢复备份
+                            // Rename failed: restore the backup
                             if backup_created {
                                 let _ = sftp.rename(
                                     &backup_path,
@@ -299,7 +299,7 @@ pub fn upload_file_streaming(
             };
 
             if let Err(e) = rename_result {
-                // rename 失败时保留远程临时文件，避免数据丢失
+                // When rename fails, keep the remote temp file to avoid data loss
                 let temp_display = temp_remote_path.display();
                 return Err(SftpOpsError::Operation(format!(
                     "Failed to rename the remote temporary file: {e}. Temporary file: {temp_display}"
@@ -307,7 +307,7 @@ pub fn upload_file_streaming(
             }
         }
         Err(_) => {
-            // 取消或失败：清理临时文件
+            // Cancelled or failed: clean up the temp file
             let _ = sftp.remove_file(&temp_remote_path);
         }
     }
@@ -315,11 +315,11 @@ pub fn upload_file_streaming(
     result
 }
 
-/// 流式下载远程文件到本地
+/// Stream-download a remote file to local
 ///
-/// 使用临时文件模式：先写入 .sftp_partial 后缀的临时文件，
-/// 完成后 rename 到目标路径，取消或失败时清理临时文件，
-/// 避免截断已有本地文件导致数据丢失。
+/// Uses the temp-file pattern: write first to a temp file with the .sftp_partial suffix,
+/// then rename to the target path when done; on cancel or failure the temp file is cleaned up,
+/// avoiding truncating an existing local file and losing data.
 pub fn download_file_streaming(
     sftp: &Sftp,
     remote_path: &Path,
@@ -335,7 +335,7 @@ pub fn download_file_streaming(
         fs::create_dir_all(parent).map_err(|e| SftpOpsError::LocalIo(e.to_string()))?;
     }
 
-    // 使用临时路径下载，避免截断已有文件
+    // Download via a temp path to avoid truncating an existing file
     let local_display = local_path.display();
     let temp_local_path = PathBuf::from(format!("{local_display}.sftp_partial"));
     let mut local_file =
@@ -370,9 +370,9 @@ pub fn download_file_streaming(
 
     match &result {
         Ok(()) => {
-            // 下载成功：rename 临时文件到目标路径
+            // Download succeeded: rename the temp file to the target path
             if let Err(e) = fs::rename(&temp_local_path, local_path) {
-                // rename 失败时保留本地临时文件，避免数据丢失
+                // When rename fails, keep the local temp file to avoid data loss
                 let temp_display = temp_local_path.display();
                 return Err(SftpOpsError::LocalIo(format!(
                     "Rename failed: {e}. The downloaded temporary file was kept at: {temp_display}"
@@ -380,7 +380,7 @@ pub fn download_file_streaming(
             }
         }
         Err(_) => {
-            // 取消或失败：清理临时文件
+            // Cancelled or failed: clean up the temp file
             let _ = fs::remove_file(&temp_local_path);
         }
     }
@@ -388,7 +388,7 @@ pub fn download_file_streaming(
     result
 }
 
-/// 递归上传本地目录到远程
+/// Recursively upload a local directory to the remote
 pub fn upload_dir_recursive(
     sftp: &Sftp,
     local_dir: &Path,
@@ -427,7 +427,7 @@ pub fn upload_dir_recursive(
     Ok(())
 }
 
-/// 递归下载远程目录到本地
+/// Recursively download a remote directory to local
 pub fn download_dir_recursive(
     sftp: &Sftp,
     remote_dir: &Path,
@@ -448,7 +448,7 @@ pub fn download_dir_recursive(
             return Err(SftpOpsError::Cancelled);
         }
 
-        // 路径遍历防护：验证远程服务器返回的文件名安全性
+        // Path traversal protection: validate that file names returned by the remote server are safe
         if entry.name.is_empty()
             || entry.name.starts_with('/')
             || entry.name.starts_with('\\')
@@ -489,7 +489,7 @@ pub fn download_dir_recursive(
     Ok(())
 }
 
-/// 根据服务器配置构建认证方式
+/// Build the authentication method from the server configuration
 fn build_auth_method(
     server: &SshServerInfo,
     resolved_auth: &ResolvedSshAuth,
@@ -525,7 +525,7 @@ fn build_auth_method(
     }
 }
 
-/// 展开路径中的 ~ 为用户主目录
+/// Expand ~ in a path to the user's home directory
 fn shellexpand_path(path: &str) -> String {
     if path.starts_with("~/") {
         if let Some(home) = dirs::home_dir() {
@@ -537,7 +537,7 @@ fn shellexpand_path(path: &str) -> String {
     path.to_string()
 }
 
-/// 将读/写/执行布尔值转换为 rwx 权限字符串
+/// Convert read/write/execute booleans to an rwx permission string
 pub(crate) fn bool_to_rwx(read: bool, write: bool, exec: bool) -> String {
     let mut s = String::with_capacity(3);
     s.push(if read { 'r' } else { '-' });
@@ -546,10 +546,10 @@ pub(crate) fn bool_to_rwx(read: bool, write: bool, exec: bool) -> String {
     s
 }
 
-/// 规范化远程路径，将 Windows 反斜杠替换为正斜杠
+/// Normalize a remote path, replacing Windows backslashes with forward slashes
 ///
-/// 远程服务器（Linux）只接受正斜杠路径分隔符，
-/// 在 Windows 上 PathBuf::join 会产生反斜杠，必须转换。
+/// Remote servers (Linux) only accept forward slash path separators,
+/// and on Windows PathBuf::join produces backslashes, which must be converted.
 pub(crate) fn normalize_remote_path(path: &PathBuf) -> PathBuf {
     PathBuf::from(path.to_string_lossy().replace('\\', "/"))
 }
@@ -558,7 +558,7 @@ pub(crate) fn normalize_remote_path(path: &PathBuf) -> PathBuf {
 mod tests {
     use super::*;
 
-    /// 测试 SftpOpsError::Connection Display 输出
+    /// Test SftpOpsError::Connection Display output
     #[test]
     fn test_sftp_ops_error_display_connection() {
         assert_eq!(
@@ -567,7 +567,7 @@ mod tests {
         );
     }
 
-    /// 测试 SftpOpsError::Operation Display 输出
+    /// Test SftpOpsError::Operation Display output
     #[test]
     fn test_sftp_ops_error_display_operation() {
         assert_eq!(
@@ -576,7 +576,7 @@ mod tests {
         );
     }
 
-    /// 测试 SftpOpsError::LocalIo Display 输出
+    /// Test SftpOpsError::LocalIo Display output
     #[test]
     fn test_sftp_ops_error_display_local_io() {
         assert_eq!(
@@ -585,7 +585,7 @@ mod tests {
         );
     }
 
-    /// 测试 SftpOpsError::NoCredentials Display 输出
+    /// Test SftpOpsError::NoCredentials Display output
     #[test]
     fn test_sftp_ops_error_display_no_credentials() {
         assert_eq!(
@@ -594,13 +594,13 @@ mod tests {
         );
     }
 
-    /// 测试 SftpOpsError::Cancelled Display 输出
+    /// Test SftpOpsError::Cancelled Display output
     #[test]
     fn test_sftp_ops_error_display_cancelled() {
         assert_eq!(SftpOpsError::Cancelled.to_string(), "Transfer cancelled");
     }
 
-    /// 测试从 std::io::Error 转换为 SftpOpsError
+    /// Test conversion from std::io::Error to SftpOpsError
     #[test]
     fn test_sftp_ops_error_from_io_error() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
@@ -608,7 +608,7 @@ mod tests {
         assert!(matches!(ops_err, SftpOpsError::LocalIo(_)));
     }
 
-    /// 测试从 warp_sftp::SftpError 转换为 SftpOpsError
+    /// Test conversion from warp_sftp::SftpError to SftpOpsError
     #[test]
     fn test_sftp_ops_error_from_sftp_error() {
         let sftp_err = warp_sftp::SftpError::General("test error".into());
@@ -616,7 +616,7 @@ mod tests {
         assert!(matches!(ops_err, SftpOpsError::Operation(_)));
     }
 
-    /// 测试 shellexpand_path 展开 ~/ 路径
+    /// Test shellexpand_path expanding a ~/ path
     #[test]
     fn test_shellexpand_path_home() {
         let home = dirs::home_dir().unwrap_or_default();
@@ -627,85 +627,85 @@ mod tests {
         }
     }
 
-    /// 测试 shellexpand_path 不变绝对路径
+    /// Test shellexpand_path leaving an absolute path unchanged
     #[test]
     fn test_shellexpand_path_absolute() {
         let result = shellexpand_path("/absolute/path");
         assert_eq!(result, "/absolute/path");
     }
 
-    /// 测试 shellexpand_path 不变相对路径
+    /// Test shellexpand_path leaving a relative path unchanged
     #[test]
     fn test_shellexpand_path_relative() {
         let result = shellexpand_path("relative/path");
         assert_eq!(result, "relative/path");
     }
 
-    /// 测试 shellexpand_path 仅 ~ 不展开
+    /// Test shellexpand_path not expanding a lone ~
     #[test]
     fn test_shellexpand_path_tilde_only() {
         let result = shellexpand_path("~");
         assert_eq!(result, "~");
     }
 
-    /// 测试 shellexpand_path 空路径
+    /// Test shellexpand_path with an empty path
     #[test]
     fn test_shellexpand_path_empty() {
         let result = shellexpand_path("");
         assert_eq!(result, "");
     }
 
-    // ==================== bool_to_rwx 测试 ====================
+    // ==================== bool_to_rwx tests ====================
 
-    /// 测试全部权限 rwx
+    /// Test all permissions rwx
     #[test]
     fn test_bool_to_rwx_all_true() {
         assert_eq!(bool_to_rwx(true, true, true), "rwx");
     }
 
-    /// 测试全部无权限
+    /// Test no permissions
     #[test]
     fn test_bool_to_rwx_all_false() {
         assert_eq!(bool_to_rwx(false, false, false), "---");
     }
 
-    /// 测试仅读权限
+    /// Test read-only permission
     #[test]
     fn test_bool_to_rwx_read_only() {
         assert_eq!(bool_to_rwx(true, false, false), "r--");
     }
 
-    /// 测试仅写权限
+    /// Test write-only permission
     #[test]
     fn test_bool_to_rwx_write_only() {
         assert_eq!(bool_to_rwx(false, true, false), "-w-");
     }
 
-    /// 测试仅执行权限
+    /// Test execute-only permission
     #[test]
     fn test_bool_to_rwx_exec_only() {
         assert_eq!(bool_to_rwx(false, false, true), "--x");
     }
 
-    /// 测试读写权限
+    /// Test read-write permission
     #[test]
     fn test_bool_to_rwx_read_write() {
         assert_eq!(bool_to_rwx(true, true, false), "rw-");
     }
 
-    /// 测试读执行权限
+    /// Test read-execute permission
     #[test]
     fn test_bool_to_rwx_read_exec() {
         assert_eq!(bool_to_rwx(true, false, true), "r-x");
     }
 
-    /// 测试写执行权限
+    /// Test write-execute permission
     #[test]
     fn test_bool_to_rwx_write_exec() {
         assert_eq!(bool_to_rwx(false, true, true), "-wx");
     }
 
-    /// 测试返回值长度始终为 3
+    /// Test that the return value length is always 3
     #[test]
     fn test_bool_to_rwx_length() {
         for r in [true, false] {
@@ -717,7 +717,7 @@ mod tests {
         }
     }
 
-    /// 测试每个位置字符只可能是目标字符
+    /// Test that each position can only hold the expected characters
     #[test]
     fn test_bool_to_rwx_valid_chars() {
         for r in [true, false] {
@@ -733,9 +733,9 @@ mod tests {
         }
     }
 
-    // ==================== SftpOpsError 边界场景测试 ====================
+    // ==================== SftpOpsError edge case tests ====================
 
-    /// 测试 SftpOpsError::Connection 空消息
+    /// Test SftpOpsError::Connection with an empty message
     #[test]
     fn test_sftp_ops_error_connection_empty() {
         assert_eq!(
@@ -744,7 +744,7 @@ mod tests {
         );
     }
 
-    /// 测试 SftpOpsError::Operation 空消息
+    /// Test SftpOpsError::Operation with an empty message
     #[test]
     fn test_sftp_ops_error_operation_empty() {
         assert_eq!(
@@ -753,7 +753,7 @@ mod tests {
         );
     }
 
-    /// 测试 SftpOpsError::LocalIo 空消息
+    /// Test SftpOpsError::LocalIo with an empty message
     #[test]
     fn test_sftp_ops_error_local_io_empty() {
         assert_eq!(
@@ -762,7 +762,7 @@ mod tests {
         );
     }
 
-    /// 测试 SftpOpsError::NoCredentials 空消息
+    /// Test SftpOpsError::NoCredentials with an empty message
     #[test]
     fn test_sftp_ops_error_no_credentials_empty() {
         assert_eq!(
@@ -771,7 +771,7 @@ mod tests {
         );
     }
 
-    /// 测试 SftpOpsError::Cancelled 始终为固定文本
+    /// Test SftpOpsError::Cancelled always having fixed text
     #[test]
     fn test_sftp_ops_error_cancelled_consistent() {
         let s1 = SftpOpsError::Cancelled.to_string();
@@ -780,7 +780,7 @@ mod tests {
         assert_eq!(s1, "Transfer cancelled");
     }
 
-    /// 测试 shellexpand_path 多级 ~/ 展开
+    /// Test shellexpand_path with multi-level ~/ expansion
     #[test]
     fn test_shellexpand_path_home_nested() {
         let result = shellexpand_path("~/a/b/c");
@@ -788,7 +788,7 @@ mod tests {
         assert!(result.contains("a/b/c"));
     }
 
-    /// 测试 shellexpand_path 仅 ~ 后跟 / 无附加路径
+    /// Test shellexpand_path with ~ followed only by / and no additional path
     #[test]
     fn test_shellexpand_path_home_root() {
         let result = shellexpand_path("~/");

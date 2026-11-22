@@ -1,8 +1,6 @@
 ---
 const languages = [
   { value: 'en', label: 'English', mark: 'EN' },
-  { value: 'zh', label: '简体中文', mark: '中' },
-  { value: 'ja', label: '日本語', mark: '日' },
 ];
 ---
 <div class="lang" data-locale-menu>
@@ -14,10 +12,7 @@ const languages = [
       <path d="M8 1.75c-1.9 2-2.9 4.1-2.9 6.25S6.1 12.25 8 14.25"/>
     </svg>
     <span class="sr-only">
-      <span data-lang="en">Language</span>
-      <span data-lang="zh">语言</span>
-      <span data-lang="ja">言語</span>
-    </span>
+      <span data-lang="en">Language</span>    </span>
   </button>
   <div class="lang-menu" data-locale-options role="listbox" hidden>
     {languages.map((language) => (

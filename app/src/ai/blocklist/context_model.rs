@@ -50,24 +50,24 @@ pub struct PendingFile {
     pub mime_type: String,
 }
 
-/// 单个 text-like PendingFile inline 进 prompt 的硬上限,超出直接 skip(避免拉爆 context)。
-/// 与 `attachment_utils::MAX_ATTACHMENT_SIZE_BYTES`(10MB,用于二进制附件)区别:
-/// 那个是字节上限,这个是 inline 进 LLM prompt 的 token 友好上限。
+/// Hard limit for inlining a single text-like PendingFile into the prompt; larger ones are skipped (to avoid blowing up the context).
+/// Differs from `attachment_utils::MAX_ATTACHMENT_SIZE_BYTES` (10MB, for binary attachments):
+/// that one is a byte cap, this one is a token-friendly cap for inlining into the LLM prompt.
 const MAX_INLINE_TEXT_FILE_BYTES: usize = 256 * 1024;
 
-/// 单个 binary PendingFile(PDF / 音频 / 其它)送进 BYOP `Binary` ContentPart 的硬上限。
-/// 跟二进制附件使用同一个 10MB 上限,避免一次请求 base64 后撑爆 HTTP body。
+/// Hard limit for a single binary PendingFile (PDF / audio / other) sent as a BYOP `Binary` ContentPart.
+/// Uses the same 10MB cap as binary attachments, to avoid base64 inflating the HTTP body in one request.
 const MAX_INLINE_BINARY_FILE_BYTES: usize = 10 * 1024 * 1024;
 
-/// 判断 PendingFile 是否"看起来是文本",决定 P0 是否 inline。
-/// 走 mime + 扩展名双保险:`mime_guess` 对 Dockerfile/Makefile 这类无扩展名文件
-/// 会返回 `application/octet-stream`,需要补扩展名/文件名匹配。
+/// Decide whether a PendingFile "looks like text", which determines whether P0 inlines it.
+/// Uses mime + extension as a double safeguard: `mime_guess` returns `application/octet-stream` for extensionless files
+/// such as Dockerfile/Makefile, so extension/file-name matching is needed as a supplement.
 fn is_text_like(file: &PendingFile) -> bool {
     let mime = file.mime_type.as_str();
     if mime.starts_with("text/") {
         return true;
     }
-    // 常见文本类 application/* mime
+    // Common text-like application/* mimes
     matches!(
         mime,
         "application/json"
@@ -87,10 +87,10 @@ fn is_text_like(file: &PendingFile) -> bool {
     ) || is_text_like_by_filename(&file.file_name)
 }
 
-/// 文件名 / 扩展名兜底,覆盖无扩展名约定文件(Dockerfile / Makefile / .env 等)。
+/// File-name / extension fallback, covering conventionally named extensionless files (Dockerfile / Makefile / .env etc.).
 fn is_text_like_by_filename(file_name: &str) -> bool {
     let lower = file_name.to_ascii_lowercase();
-    // 无扩展名的约定文件
+    // Conventional extensionless files
     if matches!(
         lower.as_str(),
         "dockerfile"
@@ -108,7 +108,7 @@ fn is_text_like_by_filename(file_name: &str) -> bool {
     ) {
         return true;
     }
-    // 扩展名兜底
+    // Extension fallback
     let ext = match lower.rsplit_once('.') {
         Some((_, ext)) => ext,
         None => return false,
@@ -186,29 +186,29 @@ fn is_text_like_by_filename(file_name: &str) -> bool {
     )
 }
 
-/// 读 PendingFile 的内容,转成 BYOP / warp-own 双路都能消费的 `FileContext`。
+/// Read the content of a PendingFile and convert it into a `FileContext` consumable by both the BYOP and warp-own paths.
 ///
-/// 三档路径:
-/// 1. **text-like 命中 + UTF-8 ok + 不超 text cap** → `StringContent`,内联进 `<file>` XML
-/// 2. **多模态 mime(image/pdf/audio)+ 不超 binary cap** → `BinaryContent(bytes)`,
-///    BYOP 升级成 `ContentPart::Binary` 真正发给模型
-/// 3. **其它 binary(.exe / .zip / 超大文件)** → `BinaryContent(空 Vec)` —— 不读 bytes
-///    避免内存浪费,但仍创建 FileContext,让 AI 至少能在 prefix XML 里看到
-///    path / mime / size,可调 read_files 等工具自己进一步处理
+/// Three tiers:
+/// 1. **text-like hit + UTF-8 ok + within text cap** -> `StringContent`, inlined into `<file>` XML
+/// 2. **multimodal mime (image/pdf/audio) + within binary cap** -> `BinaryContent(bytes)`,
+///    which BYOP upgrades to `ContentPart::Binary` and sends to the model for real
+/// 3. **other binary (.exe / .zip / oversized files)** -> `BinaryContent(empty Vec)` -- bytes are not read
+///    to avoid wasting memory, but a FileContext is still created so the AI can at least see
+///    path / mime / size in the prefix XML and call tools like read_files to process further
 ///
-/// 关键修复:`file_name` 字段塞**完整绝对路径**而不是 basename。`FileContext.file_name`
-/// 在 `convert.rs:750` 里已经被当 `file_path` 用,user_context 也按 `path` 渲染,
-/// 这里塞完整路径让 AI 能用 read_files / shell 工具直接定位文件。
+/// Key fix: the `file_name` field holds the **full absolute path** instead of the basename. `FileContext.file_name`
+/// is already used as `file_path` in `convert.rs:750`, and user_context also renders it as `path`;
+/// putting the full path here lets the AI locate the file directly with read_files / shell tools.
 ///
-/// 设计权衡:warp-own 协议路径上 `BinaryContent` 在 `convert.rs:759` 里被 `Vec<api::FileContent>::from`
-/// 直接丢弃(返回空 vec),所以即便我们在这里把所有 binary 都塞进 context 也不会
-/// 污染 warp-own 数据流;只有 BYOP 的 `user_context::render_user_attachments` 会
-/// 真正消费 BinaryContent 并升级成 `ContentPart::Binary`。
+/// Design tradeoff: on the warp-own protocol path, `BinaryContent` is dropped by `Vec<api::FileContent>::from` in `convert.rs:759`
+/// (returning an empty vec), so even if we put all binaries into the context here it does not
+/// pollute the warp-own data flow; only BYOP's `user_context::render_user_attachments`
+/// actually consumes BinaryContent and upgrades it to `ContentPart::Binary`.
 fn read_pending_file_for_context(file: &PendingFile) -> Option<FileContext> {
     let full_path = file.file_path.to_string_lossy().into_owned();
     let metadata_size = std::fs::metadata(&file.file_path).ok().map(|m| m.len());
 
-    // 1) text-like 试 UTF-8
+    // 1) text-like: try UTF-8
     if is_text_like(file) {
         if let Some(size) = metadata_size {
             if size as usize <= MAX_INLINE_TEXT_FILE_BYTES {
@@ -222,7 +222,7 @@ fn read_pending_file_for_context(file: &PendingFile) -> Option<FileContext> {
                                 None,
                             ));
                         }
-                        // text-like 但内容不是 UTF-8 → 落到 binary 路径
+                        // text-like but content is not UTF-8 -> fall through to the binary path
                     }
                     Err(e) => {
                         log::warn!(
@@ -236,7 +236,7 @@ fn read_pending_file_for_context(file: &PendingFile) -> Option<FileContext> {
         }
     }
 
-    // 2) 多模态 binary(image/pdf/audio):需要把 bytes 真送给模型,读取并落 BinaryContent
+    // 2) Multimodal binary (image/pdf/audio): the bytes must really be sent to the model, so read them and store as BinaryContent
     let mime = file.mime_type.to_ascii_lowercase();
     let is_multimodal_mime =
         mime.starts_with("image/") || mime == "application/pdf" || mime.starts_with("audio/");
@@ -268,7 +268,7 @@ fn read_pending_file_for_context(file: &PendingFile) -> Option<FileContext> {
                     size,
                     MAX_INLINE_BINARY_FILE_BYTES
                 );
-                // 超大多模态文件:落空 BinaryContent,placeholder 仍带 size(从 metadata 来)
+                // Oversized multimodal file: fall back to empty BinaryContent; the placeholder still carries size (from metadata)
                 return Some(FileContext::new(
                     full_path,
                     AnyFileContent::BinaryContent(Vec::new()),
@@ -279,9 +279,9 @@ fn read_pending_file_for_context(file: &PendingFile) -> Option<FileContext> {
         }
     }
 
-    // 3) 其它 binary(.exe / .zip / 未知类型 / metadata 读不到):空 BinaryContent
-    // 不读 bytes,避免 100MB exe 占用内存;AI 通过 prefix XML 拿到 path/mime/size
-    // 即可决定是否调 read_files 或 shell 工具进一步处理。
+    // 3) Other binary (.exe / .zip / unknown type / metadata unreadable): empty BinaryContent
+    // Do not read bytes, to avoid a 100MB exe taking memory; the AI gets path/mime/size from the prefix XML
+    // and can decide whether to call read_files or shell tools to process further.
     Some(FileContext::new(
         full_path,
         AnyFileContent::BinaryContent(Vec::new()),
@@ -361,7 +361,7 @@ pub struct BlocklistAIContextModel {
     /// Storage for diff hunk attachments that can be referenced in queries
     pending_inline_diff_hunk_attachments: HashMap<String, AIAgentAttachment>,
 
-    /// 输入框中以可见 @名称 展示的上下文附件。
+    /// Context attachments shown as a visible @name in the input box.
     pending_inline_at_context_attachments: HashMap<String, AIAgentAttachment>,
 
     /// The pending query could be new, which means it starts a new conversation, or follow-up, which means
@@ -664,8 +664,8 @@ impl BlocklistAIContextModel {
     /// If false, excludes these user-specific contexts but includes everything else.
     pub fn pending_context(&self, app: &AppContext, is_user_query: bool) -> Vec<AIAgentContext> {
         let pwd = self.current_pwd();
-        // Warp:原会查 RepoOutlines 判断当前 pwd 下仓库是否已建索引,以便
-        // 可选择“使用代码库语义搜索”作为上下文。现 outline 已下线,总是为 false。
+        // Warp: this used to query RepoOutlines to check whether the repo under the current pwd was indexed, so that
+        // "use codebase semantic search" could be offered as context. Outline is now removed, so this is always false.
         let is_pwd_indexed = false;
 
         let project_rules = if let Some(pwd) = pwd.clone().and_then(|path| {
@@ -673,10 +673,10 @@ impl BlocklistAIContextModel {
                 .ok()
                 .and_then(|s| s.canonicalize().ok())
         }) {
-            // 优先走正常路径(零 IO,异步索引完成后从 HashMap 拿结果);
-            // 未就绪时同步 fast-path stat + 读 cwd/祖先目录的规则文件。
-            // 对齐 opencode `findUp` 模式,保证 cd 后立即发问也能拿到 AGENTS.md 。
-            // fast-path 内部有 cache + 时间预算,UI 绝不阻塞。详见
+            // Prefer the normal path (zero IO; once async indexing finishes, read the result from the HashMap);
+            // when not ready, synchronously fast-path stat + read the rule files in cwd/ancestor directories.
+            // Aligns with opencode's `findUp` pattern so asking right after cd can still get AGENTS.md.
+            // The fast path has an internal cache + time budget, so the UI never blocks. See
             // `crates/ai/src/project_context/model.rs::find_rules_with_fast_path`。
             ProjectContextModel::as_ref(app).find_rules_with_fast_path(&pwd)
         } else {
@@ -763,11 +763,11 @@ impl BlocklistAIContextModel {
                 }
             }
 
-            // Warp P0/P1: 把 PendingFile 同步读入并以 AIAgentContext::File 推进 context。
-            // - text-like (UTF-8 解析成功) → StringContent → 走 user_context.rs::render_file
-            //   渲染成 <file> XML 块(BYOP)/ api::input_context::File(warp-own)
-            // - binary (PDF / 音频 / 其它) → BinaryContent → 走 BYOP user_context Binary
-            //   ContentPart 升级路径(warp-own 在 convert.rs:759 直接丢弃,无副作用)
+            // Warp P0/P1: read the PendingFile synchronously and push it into context as AIAgentContext::File.
+            // - text-like (UTF-8 parses) -> StringContent -> rendered by user_context.rs::render_file
+            //   into a <file> XML block (BYOP) / api::input_context::File (warp-own)
+            // - binary (PDF / audio / other) -> BinaryContent -> goes through the BYOP user_context Binary
+            //   ContentPart upgrade path (warp-own drops it at convert.rs:759, no side effect)
             for attachment in &self.pending_attachments {
                 if let PendingAttachment::File(file) = attachment {
                     if let Some(file_context) = read_pending_file_for_context(file) {
@@ -1224,7 +1224,7 @@ impl BlocklistAIContextModel {
         self.pending_inline_diff_hunk_attachments.clear();
     }
 
-    /// 登记一个可在后续 query 中按 @名称 引用的上下文附件。
+    /// Register a context attachment that can be referenced by @name in later queries.
     pub fn register_at_context_attachment(
         &mut self,
         reference: String,
@@ -1234,7 +1234,7 @@ impl BlocklistAIContextModel {
             .insert(reference, attachment);
     }
 
-    /// 返回按可见引用字符串索引的 @ 上下文附件。
+    /// Return the @ context attachments indexed by visible reference string.
     pub fn pending_at_context_attachments(&self) -> &HashMap<String, AIAgentAttachment> {
         &self.pending_inline_at_context_attachments
     }
@@ -1274,7 +1274,7 @@ impl BlocklistAIContextModel {
         matched_references
     }
 
-    /// 返回当前 query 中仍然存在的 @ 上下文附件。
+    /// Return the @ context attachments still present in the current query.
     pub fn referenced_at_context_attachments(
         &self,
         query: &str,
@@ -1290,14 +1290,14 @@ impl BlocklistAIContextModel {
             .collect()
     }
 
-    /// 删除输入框中已经不存在的 @ 上下文附件。
+    /// Remove @ context attachments that no longer exist in the input box.
     pub fn retain_at_context_attachments_in_query(&mut self, query: &str) {
         let references = self.at_context_references_in_query(query);
         self.pending_inline_at_context_attachments
             .retain(|reference, _attachment| references.contains(reference));
     }
 
-    /// 清空所有 @ 上下文附件。
+    /// Clear all @ context attachments.
     pub fn clear_at_context_attachments(&mut self) {
         self.pending_inline_at_context_attachments.clear();
     }

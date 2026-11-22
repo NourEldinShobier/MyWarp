@@ -67,10 +67,10 @@ pub(super) fn init(_ctx: &mut AppContext) {
     #[cfg(feature = "release_bundle")]
     _ctx.add_singleton_model(SingleInstanceManager::new);
 
-    // 注册表 URI handler 注册(warp:// 协议)是纯同步多次写 HKCU,
-    // 与主线程任何 UI 初始化都没依赖。冷启动耗时 ~30–60 ms,
-    // 丢到后台线程跳出关键路径。失败逻辑原本就是 log::error,
-    // 后台跳不会错过任何信息。
+    // Registering the registry URI handler (warp:// protocol) is a purely synchronous series of HKCU writes,
+    // with no dependency on any main-thread UI initialization. Cold start takes ~30-60 ms,
+    // so it is moved to a background thread, off the critical path. The failure handling was already just log::error,
+    // so running in the background does not miss any information.
     std::thread::Builder::new()
         .name("warp-uri-handler-register".into())
         .spawn(register_uri_handler)

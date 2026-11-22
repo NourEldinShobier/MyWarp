@@ -417,8 +417,8 @@ impl AIContextMenu {
                     categories.push(AIContextMenuCategory::CurrentFolderFiles);
                 }
             }
-            // Warp:原会根据 outline_codebase_symbols_for_at_context_menu 设置 push Code
-            // 分类,现 outline 下线,Code 分类不再出现。
+            // Warp: this used to push the Code category based on the outline_codebase_symbols_for_at_context_menu setting,
+            // but with outline taken offline, the Code category no longer appears.
             return categories;
         }
 
@@ -452,7 +452,7 @@ impl AIContextMenu {
                 categories.push(AIContextMenuCategory::Commands);
             }
             categories.push(AIContextMenuCategory::Blocks);
-            // Warp:Code 分类随 outline 下线同步推退,不再 push。
+            // Warp: the Code category was retired together with outline, so it is no longer pushed.
             if show_warp_drive && FeatureFlag::DriveObjectsAsContext.is_enabled() {
                 categories.push(AIContextMenuCategory::Workflows);
                 categories.push(AIContextMenuCategory::Notebooks);
@@ -474,8 +474,8 @@ impl AIContextMenu {
             categories
         } else if !is_shared_session_viewer {
             // Terminal mode: show Files category only.
-            // Warp:原这里还会按 outline_codebase_symbols_for_at_context_menu push Code
-            // 分类,现 outline 下线,Code 分类不再出现。
+            // Warp: this used to also push the Code category based on outline_codebase_symbols_for_at_context_menu,
+            // but with outline taken offline, the Code category no longer appears.
 
             if is_active_dir_in_git_repo {
                 vec![AIContextMenuCategory::RepoFiles]
@@ -595,9 +595,9 @@ impl AIContextMenu {
         // Get initial categories for proper initialization
         let initial_categories = Self::get_categories_for_mode(true, false, false, false, ctx); // Default to AI mode, not a viewer, not ambient agent, not CLI agent input
 
-        // Warp:原这里会创建 CodeSymbolCache(订阅 RepoOutlines) 以支持
-        // 代码符号搜索。该功能已随 outline 推退下线,这些订阅/创建代码
-        // 一并删除。
+        // Warp: this used to create a CodeSymbolCache (subscribing to RepoOutlines) to support
+        // code symbol search. That feature was retired along with outline, so these subscriptions/creation code
+        // are all deleted.
 
         let mut result = Self {
             mixer,
@@ -867,8 +867,8 @@ impl AIContextMenu {
                     );
                 });
             }
-            // Warp:Code 分类随 outline 下线推退。该分类不会出现在 categories 中,
-            // 但 enum variant 保留以避免 match 大面积破坏;这里不会被命中。
+            // Warp: the Code category was retired together with outline. It never appears in categories,
+            // but the enum variant is kept to avoid breaking matches widely; this arm is never hit.
             #[cfg(not(target_family = "wasm"))]
             NavigationState::Category(AIContextMenuCategory::Workflows) => {
                 let workflow_data_source = ctx.add_model(|_| WorkflowDataSource::new());
@@ -1043,8 +1043,8 @@ impl AIContextMenu {
                         mixer.add_sync_source(block_data_source, [QueryFilter::Blocks]);
                     });
                 }
-                // Warp:Code 分类随 outline 下线推退;不会出现但保留 noop 分支
-                // 避免 match 错误。
+                // Warp: the Code category was retired together with outline; it never appears, but the noop branch is kept
+                // to avoid match errors.
                 AIContextMenuCategory::Code => {}
                 AIContextMenuCategory::Workflows => {
                     let workflow_data_source = ctx.add_model(|_| WorkflowDataSource::new());
@@ -1335,9 +1335,9 @@ impl AIContextMenu {
         .finish()
     }
 
-    // Warp:原 `render_code_symbols_indexing` 负责在代码符号索引中时渲染
-    // “Code symbols indexing...” 提示。outline 下线后该渲染路径不会被调,
-    // 函数一并删除。
+    // Warp: `render_code_symbols_indexing` used to render the
+    // "Code symbols indexing..." hint while code symbols were being indexed. With outline offline this render path is never called,
+    // so the function is deleted.
 
     fn render_matching_results(
         &self,
@@ -1544,8 +1544,8 @@ impl AIContextMenu {
         fallback: Box<dyn Element>,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        // Warp:原这里会检查 Code 分类下是否正在索引代码符号,如是则走
-        // `render_code_symbols_indexing` 提示。outline 下线后该分类不会出现,完全删除。
+        // Warp: this used to check whether the Code category was indexing code symbols and, if so, show the
+        // `render_code_symbols_indexing` hint. With outline offline the category never appears, so it is removed entirely.
         let _ = category;
 
         if self.mixer.as_ref(app).is_loading() {

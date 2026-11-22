@@ -351,7 +351,7 @@ impl AgentDriver {
             )
         );
 
-        // Warp 启动时会初始化本地用户;走到这里说明本地 auth singleton 未正确初始化。
+        // Warp initializes the local user at startup; reaching here means the local auth singleton was not initialized correctly.
         if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
             return Err(AgentDriverError::NotLoggedIn);
         }
@@ -1376,8 +1376,8 @@ impl AgentDriver {
             }
         });
 
-        // openWarp 不同步 plan 到 Warp Drive,原 "plan_artifact_created" CLI 输出依赖云 notebook_link,
-        // 这里不再订阅 AIDocumentModel 的 SaveStatusUpdated 事件。
+        // openWarp does not sync plans to Warp Drive; the original "plan_artifact_created" CLI output depended on the cloud notebook_link,
+        // so we no longer subscribe to AIDocumentModel's SaveStatusUpdated event here.
 
         // Submit the AI query.
         self.terminal_driver.update(ctx, |td, ctx| {

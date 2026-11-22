@@ -17,7 +17,7 @@ pub enum TranscribeError {
     #[error("Failed to deserialize JSON.")]
     Deserialization,
 
-    /// Warp 已禁用语音转写(BYOP genai 协议无法承载音频)。
+    /// Warp has voice transcription disabled (the BYOP genai protocol cannot carry audio).
     #[error("Voice transcription is unavailable in Warp.")]
     Disabled,
 
@@ -55,9 +55,9 @@ impl VoiceTranscriber {
         }
     }
 
-    /// Warp(本地化,Phase 4):创建一个禁用的 transcriber。原语义上 `Some(...)`
-    /// 代表云端 STT 后端可用,`None` 代表 "transcriber disabled";本地化后云端
-    /// `ServerVoiceTranscriber`(调 server_api.transcribe 发 Wispr STT)不可用,改走该构造子。
+    /// Warp (localized, Phase 4): create a disabled transcriber. Originally `Some(...)`
+    /// meant the cloud STT backend was available and `None` meant "transcriber disabled"; after localization the cloud
+    /// `ServerVoiceTranscriber` (which called server_api.transcribe for Wispr STT) is unavailable, so this constructor is used instead.
     pub fn disabled() -> Self {
         Self { transcriber: None }
     }

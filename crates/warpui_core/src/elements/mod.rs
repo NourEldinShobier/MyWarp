@@ -131,12 +131,12 @@ pub trait Element {
         None
     }
 
-    /// 返回此元素是否为 Overlay 类型。
+    /// Returns whether this element is of the Overlay type.
     ///
-    /// Stack 在绘制子元素时会检查此方法：如果返回 true，
-    /// 则使用 `start_overlay_layer` 而非 `start_layer`，
-    /// 使子元素获得 Overlay z-index，确保事件分发时
-    /// `is_covered` 不会将自身子元素的 hit rect 误判为遮挡。
+    /// Stack checks this method when painting child elements: if it returns true,
+    /// it uses `start_overlay_layer` instead of `start_layer`,
+    /// giving the child element an Overlay z-index, so that during event dispatch
+    /// `is_covered` does not mistake the element's own child hit rect for being occluded.
     fn is_overlay(&self) -> bool {
         false
     }

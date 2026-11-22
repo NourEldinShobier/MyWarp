@@ -100,15 +100,15 @@ use warpui::{FocusContext, NextNewWindowsHasThisWindowsBoundsUponClose};
 #[cfg(target_family = "wasm")]
 use crate::auth::{WebHandoffEvent, WebHandoffView};
 
-/// 返回当前 channel 的产品名,作为窗口标题初始值与 quake/transferred 窗口标题。
+/// Returns the product name of the current channel, used as the initial window title and the quake/transferred window title.
 ///
-/// 取 `ChannelState::app_id().application_name()` 是为了让 OSS 构建显示 `Warp`、
-/// 而 Stable/Preview/Dev 等上游 channel 仍显示各自的 `Warp` / `WarpPreview` / `WarpDev`,
-/// 避免在 fork 中跨多处硬编码字符串(Windows 任务管理器按窗口标题做进程分组,
-/// 硬编码 `"Warp"` 会让 Warp 在任务管理器里显示成 `Warp(N)`)。
+/// `ChannelState::app_id().application_name()` is used so the OSS build shows `Warp`,
+/// while upstream channels such as Stable/Preview/Dev still show their own `Warp` / `WarpPreview` / `WarpDev`,
+/// avoiding hardcoded strings in many places across the fork (Windows Task Manager groups processes by window title,
+/// and hardcoding `"Warp"` would make Warp show up as `Warp(N)` in Task Manager).
 ///
-/// 注意:窗口创建后,`Workspace::update_window_title()` 会在每次 tab 切换/重命名时
-/// 用 tab 标题覆盖此值,所以此函数仅决定窗口刚打开、还未挂上 tab 时的初始标题。
+/// Note: after the window is created, `Workspace::update_window_title()` overwrites this value with the tab title on each tab switch/rename,
+/// so this function only determines the initial title when the window has just opened and no tab is attached yet.
 fn window_title() -> String {
     ChannelState::app_id().application_name().to_owned()
 }
@@ -1450,9 +1450,9 @@ impl RootView {
             me.handle_auth_manager_event(event, ctx);
         });
 
-        // Warp(本地化,Phase 5):`PreferencesSyncer` 已物理删除。
-        // 原 `InitialLoadCompleted` 事件用于在云端 preferences 同步完成后调用
-        // `apply_onboarding_settings`,本地化场景下 onboarding 设置直接本地应用。
+        // Warp (localization, Phase 5): `PreferencesSyncer` has been physically deleted.
+        // The original `InitialLoadCompleted` event was used to call `apply_onboarding_settings` after
+        // cloud preferences sync finished; in the local scenario onboarding settings are applied locally right away.
 
         let auth_view =
             ctx.add_typed_action_view(|ctx| AuthView::new(AuthViewVariant::Initial, ctx));
@@ -1472,8 +1472,8 @@ impl RootView {
             workspace_setting,
         };
 
-        // 去中心化分支:`is_logged_in` 在本地模式下恒为 true,这里保留原结构是为了
-        // 在编译期保留 wasm/onboarding 等其它分支的可达性,不需要的子分支永远不会触发。
+        // Decentralized branch: `is_logged_in` is always true in local mode; the original structure is kept here to
+        // preserve compile-time reachability of other branches such as wasm/onboarding; unneeded sub-branches never fire.
         let auth_onboarding_state = if auth_state.is_logged_in() {
             AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
         } else {
@@ -2192,11 +2192,11 @@ impl RootView {
         true
     }
 
-    /// 如果用户在进入终端前已完成本地 onboarding,则在 auth facade 进入“可用”状态后
-    /// 立刻补齐本地 `is_onboarded` 标记。
+    /// If the user completed local onboarding before entering the terminal, then once the auth facade becomes "available",
+    /// fill in the local `is_onboarded` flag immediately.
     ///
-    /// 该逻辑在每次 `AuthComplete` 时运行,因此也覆盖“先跳过登录,之后从其它入口进入
-    /// 已认证态”的路径;整个过程只更新本地 auth facade,不做任何服务端同步。
+    /// This logic runs on every `AuthComplete`, so it also covers the path of "skip login first, then enter the
+    /// authenticated state from another entry point"; the whole process only updates the local auth facade and does no server sync.
     fn finalize_local_onboarding_after_auth(auth_state: &AuthState, ctx: &mut AppContext) {
         let is_onboarded = auth_state.is_onboarded().unwrap_or(true);
         let is_anonymous = auth_state.is_user_anonymous().unwrap_or(false);
@@ -2212,8 +2212,8 @@ impl RootView {
 
         match event {
             AuthManagerEvent::AuthComplete => {
-                // 如果 onboarding 在进入 auth 完成态之前已结束,这里补齐本地
-                // `is_onboarded` 位,避免后续仍按“未完成引导”分支行事。
+                // If onboarding finished before entering the auth-complete state, fill in the local
+                // `is_onboarded` bit here, so later code does not still act on the "onboarding incomplete" branch.
                 Self::finalize_local_onboarding_after_auth(&auth_state, ctx);
 
                 // If the user needs SSO after auth is complete, no matter what their current state is,
@@ -2272,8 +2272,8 @@ impl RootView {
                             // application, which ought to be valid.
                             self.web_handoff(ctx);
                         } else {
-                            // Warp 已移除 log_out UI 入口,native 不再强制登出。
-                            log::warn!("User account disabled; ignoring (Warp 已移除 log_out)");
+                            // Warp removed the log_out UI entry; native no longer forces logout.
+                            log::warn!("User account disabled; ignoring (Warp removed log_out)");
                         }
                     }
                 }
@@ -2304,7 +2304,7 @@ impl RootView {
     ) {
         match event {
             AuthOverrideWarningModalEvent::Close => {
-                // Warp 已移除 log_out 入口,关闭时不再触发登出。
+                // Warp removed the log_out entry; no longer triggers logout on close.
             }
             AuthOverrideWarningModalEvent::BulkExport => {
                 self.export_all_warp_drive_objects(ctx);
@@ -2425,9 +2425,9 @@ impl RootView {
         true
     }
 
-    /// Warp(本地化,Phase 5):原 `handle_preferences_syncer_event` 在云端
-    /// preferences 同步初始加载完成后应用 onboarding settings,随同步器物理删除。
-    /// onboarding settings 现在在 onboarding 完成时直接应用,不需要延迟到 cloud sync 后。
+    /// Warp (localization, Phase 5): the original `handle_preferences_syncer_event` applied onboarding settings after the cloud
+    /// preferences sync initial load completed, and was physically deleted along with the syncer.
+    /// onboarding settings are now applied directly when onboarding completes, with no need to defer until after cloud sync.
     /// If onboarding stored a pending tutorial (because login was required first),
     /// start it now that the workspace exists.
     fn start_pending_tutorial(&mut self, ctx: &mut ViewContext<Self>) {
@@ -2620,8 +2620,8 @@ impl WorkspaceArgs {
 impl AuthOnboardingState {
     fn complete_auth_and_create_workspace(&mut self, ctx: &mut ViewContext<RootView>) {
         // Check if we should show onboarding (only for users who are not yet onboarded).
-        // 本地 `is_onboarded` 标记会在 `AuthComplete` 时由
-        // `RootView::finalize_local_onboarding_after_auth` 补齐。
+        // The local `is_onboarded` flag is filled in on `AuthComplete` by
+        // `RootView::finalize_local_onboarding_after_auth`.
         let auth_state = AuthStateProvider::as_ref(ctx).get();
         let is_onboarded = auth_state.is_onboarded().unwrap_or(true);
         let is_anonymous = auth_state.is_user_anonymous().unwrap_or(false);

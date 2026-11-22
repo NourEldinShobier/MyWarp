@@ -269,8 +269,8 @@ impl DataSourceStore {
             }
 
             ItemSummary::SshServer { node_id: _ } => {
-                // SSH 服务器选项的 recents 暂不展示 — 用户从 SSH 管理器树打开
-                // 才是主要路径,palette 选项是补充。返 None 不影响搜索能命中。
+                // Recents for SSH server items are not shown for now: users open them from the SSH manager tree,
+                // which is the main path; palette items are supplementary. Returning None does not stop search from matching.
                 None
             }
             ItemSummary::NoOp => {

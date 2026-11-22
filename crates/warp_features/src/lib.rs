@@ -669,7 +669,7 @@ pub enum FeatureFlag {
     /// for command execution.
     SshRemoteServer,
 
-    /// 本地 PTY 输出密码提示时展示已保存的 SSH 凭据候选。
+    /// Show saved SSH credential candidates when the local PTY prints a password prompt.
     OneKeyPrompt,
 
     /// Enables summary mode in vertical tabs, showing condensed tab summaries
@@ -682,9 +682,9 @@ pub enum FeatureFlag {
     /// the server falls back to its default.
     ConfigurableContextWindow,
 
-    /// 启用全局 HTTP 代理设置页面与 `Client::new()` 中的代理覆盖逻辑。
-    /// 关闭时,UI 入口隐藏,`Client::new()` 退回 reqwest 默认(读环境变量)。
-    /// 见 Issue #72。
+    /// Enables the global HTTP proxy settings page and the proxy override logic in `Client::new()`.
+    /// When off, the UI entry is hidden and `Client::new()` falls back to the reqwest default (reads environment variables).
+    /// See Issue #72.
     HttpProxySettings,
 }
 
@@ -764,9 +764,9 @@ pub const RELEASE_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::Autoupdate,
     FeatureFlag::Changelog,
     FeatureFlag::CrashReporting,
-    // winit 的 IME 路径在 macOS 和 Windows 都已支持 marked text。
-    // Windows 必须开启该 flag 才能渲染 IME preedit / 输入合成文本,
-    // 否则只能看到 OS 的候选窗,Warp 会把 marked text 更新整体丢弃。
+    // winit's IME path already supports marked text on both macOS and Windows.
+    // On Windows this flag must be enabled to render IME preedit / composition text,
+    // otherwise only the OS candidate window is visible and Warp discards marked text updates entirely.
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     FeatureFlag::ImeMarkedText,
     FeatureFlag::BlocklistMarkdownTableRendering,
@@ -780,8 +780,8 @@ pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[];
 
 impl FeatureFlag {
     pub fn is_enabled(&self) -> bool {
-        // 去中心化分支:本地模式下永远关闭以下账号 / 登录 / 云端 Agent 相关 flag,
-        // 不再受 channel / preview 配置影响。
+        // Decentralized branch: in local mode the following account / login / cloud Agent flags are always off,
+        // no longer affected by channel / preview configuration.
         if matches!(
             self,
             FeatureFlag::ForceLogin

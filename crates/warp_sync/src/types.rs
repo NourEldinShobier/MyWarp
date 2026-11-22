@@ -1,4 +1,4 @@
-//! 云同步通用类型定义
+//! Common type definitions for cloud sync
 //!
 // author: logic
 // date: 2026-05-24
@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// 同步平台
+/// Sync platform
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncPlatform {
     GitHub,
@@ -14,7 +14,7 @@ pub enum SyncPlatform {
 }
 
 impl SyncPlatform {
-    /// 获取平台 API 基础 URL
+    /// Gets the platform API base URL
     pub fn base_url(&self) -> &str {
         match self {
             Self::GitHub => "https://api.github.com",
@@ -22,7 +22,7 @@ impl SyncPlatform {
         }
     }
 
-    /// 获取平台显示名称
+    /// Gets the platform display name
     pub fn label(&self) -> &str {
         match self {
             Self::GitHub => "GitHub",
@@ -30,7 +30,7 @@ impl SyncPlatform {
         }
     }
 
-    /// 获取平台持久化标识
+    /// Gets the platform persistence identifier
     pub fn to_db_str(&self) -> &str {
         match self {
             Self::GitHub => "github",
@@ -39,7 +39,7 @@ impl SyncPlatform {
     }
 }
 
-/// 同步结果
+/// Sync result
 #[derive(Debug, Clone)]
 pub enum SyncResult {
     Success { version: i64, platform: SyncPlatform },
@@ -47,31 +47,31 @@ pub enum SyncResult {
     AlreadyUpToDate { version: i64 },
 }
 
-/// Gist 列表条目（API 返回）
+/// Gist list entry (returned by the API)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GistEntry {
     pub id: String,
     pub description: Option<String>,
 }
 
-/// Gist 详情（API 返回）
+/// Gist details (returned by the API)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GistDetail {
     pub id: String,
     pub files: serde_json::Map<String, serde_json::Value>,
 }
 
-/// Gist 中的完整同步数据（顶层结构）
+/// Complete sync data in a Gist (top-level structure)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncData {
     pub version: i64,
     pub synced_at: String,
-    /// 各 section 的数据，key 为 section 名（如 "ssh"），value 为该 section 的 JSON
+    /// Data of each section; the key is the section name (e.g. "ssh") and the value is that section's JSON
     #[serde(flatten)]
     pub sections: serde_json::Map<String, serde_json::Value>,
 }
 
-/// 同步引擎错误
+/// Sync engine error
 #[derive(Debug, Error)]
 pub enum SyncEngineError {
     #[error("Encryption error: {0}")]
@@ -86,13 +86,13 @@ pub enum SyncEngineError {
     VersionStore(String),
 }
 
-/// 同步元数据（版本号管理 trait，由调用方实现）
+/// Sync metadata (version management trait, implemented by the caller)
 pub trait SyncVersionStore: Send + Sync {
-    /// 获取当前同步版本号
+    /// Gets the current sync version
     fn get_sync_version(&self) -> Result<i64, SyncEngineError>;
-    /// 设置同步版本号
+    /// Sets the sync version
     fn set_sync_version(&self, version: i64) -> Result<(), SyncEngineError>;
-    /// 更新同步元数据（时间、平台）
+    /// Updates sync metadata (time, platform)
     fn update_sync_meta(&self, time: &str, platform: &str) -> Result<(), SyncEngineError>;
 }
 

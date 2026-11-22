@@ -100,8 +100,8 @@ enum FolderOpenState {
     Reversed,
 }
 
-/// [StoredObject] 信息的持久化 model。Warp 中它对应 SQLite 内的本地 object store。
-/// 超出基础 update/query 的逻辑应放在 [ObjectStoreViewModel] 并在 model_test.rs 覆盖。
+/// Persistence model for [StoredObject] info. In Warp it corresponds to the local object store in SQLite.
+/// Logic beyond basic update/query belongs in [ObjectStoreViewModel] and is covered in model_test.rs.
 pub struct ObjectStoreModel {
     objects_by_id: HashMap<ObjectUid, Box<dyn StoredObject>>,
     model_event_sender: Option<SyncSender<ModelEvent>>,
@@ -121,7 +121,7 @@ impl ObjectStoreModel {
             .map(|object| (object.uid().to_owned(), object))
             .collect::<HashMap<ObjectUid, Box<dyn StoredObject>>>();
         let initial_load_complete = Condition::new();
-        // Warp 没有云端 object 初始拉取；SQLite restore 完成后即可视为可读。
+        // Warp has no initial cloud object fetch; once the SQLite restore completes it can be treated as readable.
         initial_load_complete.set();
 
         Self {
@@ -132,7 +132,7 @@ impl ObjectStoreModel {
         }
     }
 
-    /// 等待本地 object store 可读。Warp 下该条件在 SQLite restore 后立即满足。
+    /// Waits for the local object store to become readable. In Warp this condition is met right after the SQLite restore.
     pub fn initial_load_complete(&self) -> impl Future<Output = ()> {
         self.initial_load_complete.wait()
     }
@@ -728,7 +728,7 @@ impl ObjectStoreModel {
             .count()
     }
 
-    /// 已进入错误状态且会显示在 Warp Drive index 中的本地对象数量。
+    /// Number of local objects that are in an error state and shown in the Warp Drive index.
     pub fn num_visible_errored_objects(&self) -> usize {
         self.objects_by_id
             .values()
@@ -1102,8 +1102,8 @@ impl ObjectStoreModel {
         result
     }
 
-    /// 给定 StoredObjectLocation(folder 或 space),返回直接位于该位置且未被 trashed 的本地对象。
-    /// 这个函数不会递归 nested folders。
+    /// Given a StoredObjectLocation (folder or space), returns the non-trashed local objects directly at that location.
+    /// This function does not recurse into nested folders.
     pub fn active_cloud_objects_in_location_without_descendents<'a>(
         &'a self,
         location: StoredObjectLocation,
@@ -1117,8 +1117,8 @@ impl ObjectStoreModel {
             .map(|object| object.as_ref())
     }
 
-    /// 给定 StoredObjectLocation(folder 或 space),返回直接位于该位置且已 trashed 的本地对象。
-    /// 这个函数不会递归 nested folders。
+    /// Given a StoredObjectLocation (folder or space), returns the trashed local objects directly at that location.
+    /// This function does not recurse into nested folders.
     pub fn trashed_cloud_objects_in_location_without_descendents<'a>(
         &'a self,
         location: StoredObjectLocation,
@@ -1169,8 +1169,8 @@ impl ObjectStoreModel {
             });
     }
 
-    /// 给定 StoredObjectLocation(folder 或 space),返回直接位于该位置、因父级被 trashed 而进入
-    /// trash、但未被用户显式 trashed 的本地对象。这个函数不会递归 nested folders。
+    /// Given a StoredObjectLocation (folder or space), returns the local objects directly at that location that went into
+    /// trash because their parent was trashed, but were not explicitly trashed by the user. This function does not recurse into nested folders.
     pub fn indirectly_trashed_cloud_objects_in_location_without_descendents<'a>(
         &'a self,
         location: StoredObjectLocation,
@@ -1186,7 +1186,7 @@ impl ObjectStoreModel {
             .map(|object| object.as_ref())
     }
 
-    /// 返回指定 space 中所有 active(未 trashed)本地对象。
+    /// Returns all active (non-trashed) local objects in the given space.
     pub fn active_cloud_objects_in_space<'a>(
         &'a self,
         space: Space,
@@ -1198,7 +1198,7 @@ impl ObjectStoreModel {
             .map(|object| object.as_ref())
     }
 
-    /// 返回指定 space 中所有 active(未 trashed)且非 welcome 的本地对象。
+    /// Returns all active (non-trashed) non-welcome local objects in the given space.
     pub fn active_non_welcome_cloud_objects_in_space<'a>(
         &'a self,
         space: Space,
@@ -1226,7 +1226,7 @@ impl ObjectStoreModel {
             .map(|object| object.as_ref())
     }
 
-    /// 返回指定 space 中所有 trashed 本地对象。
+    /// Returns all trashed local objects in the given space.
     pub fn trashed_cloud_objects_in_space<'a>(
         &'a self,
         space: Space,
@@ -1238,7 +1238,7 @@ impl ObjectStoreModel {
             .map(|object| object.as_ref())
     }
 
-    /// 返回指定 space 中所有被用户显式 trashed 的本地对象。
+    /// Returns all local objects in the given space that were explicitly trashed by the user.
     pub fn directly_trashed_cloud_objects_in_space<'a>(
         &'a self,
         space: Space,
@@ -1311,7 +1311,7 @@ impl ObjectStoreModel {
         }
     }
 
-    /// 下一次本地 object-store refresh 是否需要强制全量遍历对象。
+    /// Whether the next local object-store refresh needs to force a full traversal of the objects.
     pub fn cloud_objects_force_refresh_pending(&self) -> bool {
         // If there's no stated time for the next refresh, assume we should do one now. Otherwise,
         // check if we're at or past the time of the next refresh.

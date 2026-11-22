@@ -1,10 +1,10 @@
-//! `GlobalBufferModel` 的 server-local / remote buffer 同步行为测试。
+//! Tests for `GlobalBufferModel` server-local / remote buffer sync behavior.
 //!
-//! NOTE(port):上游 warpdotdev/warp 把这一组测试放在 `buffer_location_tests.rs`
-//! (经 `#[path]` 挂在 `buffer_location.rs` 下)。Warp 中该文件不存在,且
-//! `buffer_location.rs` 已有一段内联 `mod tests`(远端 markdown 识别),按本仓库
-//! `*_test.rs` 命名约定将测试模块落在本文件,并由 `global_buffer_model.rs` 挂载
-//! —— 被测对象本来就是 `GlobalBufferModel`,挂在这里更贴合。
+//! NOTE(port): upstream warpdotdev/warp puts this group of tests in `buffer_location_tests.rs`
+//! (mounted under `buffer_location.rs` via `#[path]`). That file does not exist in Warp, and
+//! `buffer_location.rs` already has an inline `mod tests` (remote markdown detection), so following this repo's
+//! `*_test.rs` naming convention the test module lives in this file and is mounted by `global_buffer_model.rs`
+//! — the subject under test is `GlobalBufferModel` anyway, so it fits better here.
 
 use remote_server::proto::TextEdit;
 use repo_metadata::repositories::DetectedRepositories;

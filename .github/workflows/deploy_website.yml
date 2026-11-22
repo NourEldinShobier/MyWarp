@@ -1,6 +1,6 @@
 name: Deploy Website
 
-# 触发:push 到默认分支且改动了 website/ 时;或手动触发
+# Trigger: push to the default branch that changes website/; or manual trigger
 on:
   push:
     branches: [main]
@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # 仅在配置了部署密钥时运行,避免 fork / 未配置环境时报错
+    # Run only when the deploy key is configured, to avoid errors on forks / unconfigured environments
     if: ${{ github.repository == 'zerx-lab/zap' }}
     defaults:
       run:
@@ -47,18 +47,18 @@ jobs:
           PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           USER: ${{ secrets.DEPLOY_USER }}
           HOST: ${{ secrets.DEPLOY_HOST }}
-          # DEPLOY_PATH = 站点 index 目录,例如 /opt/1panel/www/sites/warp.zerx.dev/index
+          # DEPLOY_PATH = site index directory, e.g. /opt/1panel/www/sites/warp.zerx.dev/index
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          # 在站点父目录(index 的上一级)准备暂存区与脚本目录
+          # Prepare the staging area and script directory in the site's parent directory (one level above index)
           PARENT="$(dirname "$DEPLOY_PATH")"
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
             "mkdir -p '$PARENT/.incoming'"
-          # 推送静态产物到 .incoming(--delete 保证与本地 dist 完全一致)
+          # Push static artifacts to .incoming (--delete keeps it identical to the local dist)
           rsync -az --delete \
             -e "ssh -i ~/.ssh/deploy_key -p $PORT" \
             dist/ "$USER@$HOST:$PARENT/.incoming/"
-          # 推送部署脚本到父目录
+          # Push the deploy script to the parent directory
           rsync -az \
             -e "ssh -i ~/.ssh/deploy_key -p $PORT" \
             deploy/deploy.sh "$USER@$HOST:$PARENT/deploy.sh"
@@ -70,8 +70,8 @@ jobs:
           HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          # 远端赋予执行权限并运行,把正式 index 目录作为参数传入
-          # 避免 pull/上传后无执行权限的问题:每次都 chmod +x
+          # Grant execute permission remotely and run, passing the real index directory as the argument
+          # Avoids the problem of no execute permission after pull/upload: chmod +x every time
           PARENT="$(dirname "$DEPLOY_PATH")"
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
             "chmod +x '$PARENT/deploy.sh' && '$PARENT/deploy.sh' '$DEPLOY_PATH'"

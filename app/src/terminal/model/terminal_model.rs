@@ -520,8 +520,8 @@ pub struct TerminalModel {
     /// bootstrapped.
     pending_session_info: Option<SessionInfo>,
 
-    /// 记录已完成引导的会话 ID。当子 shell 或 SSH 会话在引导完成前中断并退回父 shell 时，
-    /// 通过识别父 shell 的 `Precmd` session_id 来自动恢复 BlockList 状态。
+    /// Records the session IDs that have finished bootstrapping. When a child shell or SSH session is interrupted before bootstrapping completes and falls back to the parent shell,
+    /// the BlockList state is recovered automatically by recognizing the parent shell's `Precmd` session_id.
     bootstrapped_session_ids: HashSet<SessionId>,
 
     /// If true, the terminal was bootstrapping but received a ^D from the user. We cannot stop the
@@ -1636,8 +1636,8 @@ impl TerminalModel {
     }
 
     pub fn has_pending_ssh_session(&self) -> bool {
-        // `init_shell` 会把 `pending_legacy_ssh_session` take 到 `pending_session_info` 中，
-        // 必须在引导完成前持续从两边判断 SSH 状态，避免慢启动日志和遥测误报 `ssh false`。
+        // `init_shell` takes `pending_legacy_ssh_session` into `pending_session_info`,
+        // so SSH state must keep being checked from both sides until bootstrapping completes, to avoid slow-start logs and telemetry misreporting `ssh false`.
         self.pending_legacy_ssh_session.is_some()
             || self.pending_session_info.as_ref().is_some_and(|info| {
                 matches!(info.is_legacy_ssh_session, IsLegacySSHSession::Yes { .. })
@@ -1653,8 +1653,8 @@ impl TerminalModel {
         self.pending_session_info.take()
     }
 
-    /// 当远端 SSH 或子 shell 未发送 `Bootstrapped` 即断开/退出并回到已引导的父 shell 时，
-    /// 根据父 shell 发回的 `Precmd.session_id` 清理挂起的引导状态，并将 BlockList 恢复到可交互状态。
+    /// When a remote SSH or child shell disconnects/exits without sending `Bootstrapped` and returns to the already-bootstrapped parent shell,
+    /// clear the pending bootstrap state based on the `Precmd.session_id` sent back by the parent shell, and restore the BlockList to an interactive state.
     fn recover_from_aborted_bootstrap_if_needed(&mut self, precmd_session_id: Option<SessionId>) {
         let Some(sid) = precmd_session_id else {
             return;

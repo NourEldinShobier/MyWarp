@@ -1,17 +1,17 @@
 /* ============================================================
- * Zap landing — Composio 风格重构
- * 参考 composio.dev 实测 token:
- *   body bg #0f0f0f(dark)/ #f6f6f6(light),前景 #fff/#0f0f0f
- *   字体:sans (Inter) 用于标题/正文,JetBrains Mono 用于导航/按钮/标签(大写 + 字距)
- *   视觉语言:全直角(无圆角,除徽标/图标按钮)、细 1px 分隔线、深浅双色带分区、
- *            蓝紫青渐变作为强调色与装饰图形。
+ * Zap landing — Composio-style rewrite
+ * Reference: tokens measured from composio.dev
+ *   body bg #0f0f0f (dark) / #f6f6f6 (light), foreground #fff / #0f0f0f
+ *   Fonts: sans (Inter) for headings/body, JetBrains Mono for nav/buttons/labels (uppercase + letter-spacing)
+ *   Visual language: all right angles (no rounded corners except logos/icon buttons), thin 1px dividers, alternating dark/light bands,
+ *            blue-purple-cyan gradient as accent and decorative graphics.
  * ============================================================ */
 
 :root {
     color-scheme: dark;
 }
 
-/* 默认(不带 data-theme 或 = dark)与显式 dark */
+/* Default (no data-theme, or dark) and explicit dark */
 :root,
 :root[data-theme="dark"] {
     color-scheme: dark;
@@ -58,7 +58,7 @@
     --btn-text-on-ink: #0f0f0f;
     --kbd-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
 
-    /* 反色带(用于制造深浅交替节奏,始终与全局主题相反) */
+    /* Inverted band (creates alternating dark/light rhythm; always opposite to the global theme) */
     --band-bg: #f6f6f6;
     --band-ink: #0f0f0f;
     --band-muted: #6b6b6b;
@@ -68,7 +68,7 @@
     --band-btn-fg: #ffffff;
 }
 
-/* 浅色主题 */
+/* Light theme */
 :root[data-theme="light"] {
     color-scheme: light;
 
@@ -136,7 +136,7 @@ body {
     overflow-x: clip;
     max-width: 100%;
 }
-/* 主题切换过渡 */
+/* Theme switch transition */
 @media (prefers-reduced-motion: no-preference) {
     body,
     header.nav,
@@ -282,7 +282,7 @@ header.nav.scrolled {
     gap: 10px;
 }
 
-/* 语言下拉 */
+/* Language dropdown */
 .lang {
     position: relative;
 }
@@ -371,7 +371,7 @@ header.nav.scrolled {
     opacity: 1;
 }
 
-/* GitHub 按钮 */
+/* GitHub button */
 .gh {
     display: inline-flex;
     align-items: center;
@@ -457,7 +457,7 @@ header.nav.scrolled {
     }
 }
 
-/* ---------- Section label(小段首标签,mono + 方块符) ---------- */
+/* ---------- Section label (small section-leading label, mono + square marker) ---------- */
 .sec-label {
     display: inline-flex;
     align-items: center;
@@ -574,7 +574,7 @@ header.nav.scrolled {
     transform: translateX(2px);
 }
 
-/* 装饰性均衡器条(纯 CSS,呼应 composio hero 两侧的竖条动画) */
+/* Decorative equalizer bars (pure CSS, echoing the vertical bar animation on both sides of the composio hero) */
 .hero-eq {
     position: absolute;
     inset: 0;
@@ -629,7 +629,7 @@ header.nav.scrolled {
     }
 }
 
-/* Hero 下方:仿真终端窗口(全宽 bento 面板) */
+/* Below hero: simulated terminal window (full-width bento panel) */
 .hero-art {
     position: relative;
     z-index: 2;
@@ -649,7 +649,7 @@ header.nav.scrolled {
     }
 }
 
-/* Hero 下方的仿真窗口:单栏 Block 时间线 */
+/* Simulated window below hero: single-column Block timeline */
 .mock-terminal.hero-window {
     min-height: 460px;
 }
@@ -671,7 +671,7 @@ header.nav.scrolled {
     margin-top: 16px;
 }
 
-/* Block 时间线里的 AI 对话块(命令块之后紧跟的 agent turn) */
+/* AI conversation block in the Block timeline (agent turn right after a command block) */
 .stage-turn {
     display: block;
     margin: 14px 0 4px;
@@ -773,7 +773,7 @@ header.nav.scrolled {
     }
 }
 
-/* ---------- Logos 信赖墙 ---------- */
+/* ---------- Logos trust wall ---------- */
 .logos {
     position: relative;
     z-index: 2;
@@ -818,7 +818,7 @@ header.nav.scrolled {
     filter: grayscale(0);
 }
 
-/* ---------- 通用 section ---------- */
+/* ---------- Generic section ---------- */
 .section {
     padding: 88px 0;
     border-top: 1px solid var(--line);
@@ -842,7 +842,7 @@ header.nav.scrolled {
     margin: 0;
 }
 
-/* ---------- 特性区(编号 + 左字右图,交替) ---------- */
+/* ---------- Features section (numbered + text left / visual right, alternating) ---------- */
 .feat-card {
     display: grid;
     gap: 32px;
@@ -899,7 +899,7 @@ header.nav.scrolled {
     position: relative;
 }
 
-/* ---------- 客户证言(单列 + 大引号, 反色带) ---------- */
+/* ---------- Testimonial (single column + large quote, inverted band) ---------- */
 .quote {
     padding: 96px 0;
     background: var(--band-bg);
@@ -927,7 +927,7 @@ header.nav.scrolled {
     color: var(--band-muted);
 }
 
-/* ---------- "How it works" 卡片网格(未使用,保留兼容) ---------- */
+/* ---------- "How it works" card grid (unused, kept for compatibility) ---------- */
 .how-grid {
     display: grid;
     gap: 20px;
@@ -946,7 +946,7 @@ header.nav.scrolled {
     border-color: var(--line-strong);
 }
 
-/* ---------- 安装卡(install) ---------- */
+/* ---------- Install card ---------- */
 .install-card {
     border: 1px solid var(--line);
     background: var(--surface);
@@ -989,7 +989,7 @@ header.nav.scrolled {
     font-size: 11px;
 }
 
-/* ---------- 代码块 ---------- */
+/* ---------- Code block ---------- */
 .pre-wrap {
     position: relative;
 }
@@ -1041,7 +1041,7 @@ pre.code .acc {
     border-color: #6fce8a;
 }
 
-/* ---------- 终端 mock(hero 与 feature 卡内复用) ---------- */
+/* ---------- Terminal mock (reused in hero and feature cards) ---------- */
 .term-mock,
 .app-window {
     border: 1px solid var(--line);
@@ -1286,7 +1286,7 @@ pre.code .acc {
     margin-left: auto;
 }
 
-/* Term-input.live: 可执行的 fake shell */
+/* Term-input.live: executable fake shell */
 .term-input.live {
     padding: 10px 12px 12px;
 }
@@ -1357,7 +1357,7 @@ pre.code .acc {
     color: var(--syn-str);
 }
 
-/* ---------- 仿真 2: 设置-Agent 提供商 ---------- */
+/* ---------- Simulation 2: Settings - Agent providers ---------- */
 .mock-settings .app-body {
     align-items: stretch;
 }
@@ -1611,7 +1611,7 @@ pre.code .acc {
     border-color: var(--btn-ink-bg);
 }
 
-/* ---------- 仿真 3: 语言下拉 ---------- */
+/* ---------- Simulation 3: Language dropdown ---------- */
 .mock-language .app-body {
     flex-direction: column;
     padding: 20px;
@@ -1748,7 +1748,7 @@ body[data-locale="ja"] .lb-current[data-locale-current="ja"] {
     }
 }
 
-/* ---------- 特性眉标(编号 + 名称) ---------- */
+/* ---------- Feature eyebrow (number + name) ---------- */
 .feat-eyebrow {
     display: inline-flex;
     align-items: center;
@@ -1772,12 +1772,12 @@ body[data-locale="ja"] .lb-current[data-locale-current="ja"] {
     box-shadow: var(--shadow-card);
 }
 
-/* ---------- 杂项小工具 ---------- */
+/* ---------- Miscellaneous utilities ---------- */
 .muted {
     color: var(--muted);
 }
 
-/* ---------- i18n 可见性 ---------- */
+/* ---------- i18n visibility ---------- */
 body[data-locale="en"] [data-lang]:not([data-lang="en"]),
 body[data-locale="zh"] [data-lang]:not([data-lang="zh"]),
 body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
@@ -1808,7 +1808,7 @@ body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
 }
 
 /* ============================================================
- * 主题切换按钮
+ * Theme toggle button
  * ============================================================ */
 .theme-toggle {
     position: relative;
@@ -1860,7 +1860,7 @@ body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
     transform: scale(0.6) rotate(40deg);
 }
 
-/* 仿真 titlebar 里的主题按钮 */
+/* Theme button in the simulated titlebar */
 button.tb-icon.tb-theme {
     position: relative;
 }
@@ -1900,7 +1900,7 @@ button.tb-icon.tb-theme:hover {
     }
 }
 
-/* term-stage 扫描线(subtle, dark only) */
+/* term-stage scanlines (subtle, dark only) */
 .mock-terminal .app-body::before {
     content: none;
 }
@@ -1909,7 +1909,7 @@ button.tb-icon.tb-theme:hover {
     transform: scale(0.92);
 }
 
-/* ---------- 进场动画 ---------- */
+/* ---------- Entrance animations ---------- */
 .fade-in {
     opacity: 0;
     transform: translateY(14px);
@@ -1934,7 +1934,7 @@ button.tb-icon.tb-theme:hover {
     transition-delay: 0.32s;
 }
 
-/* 方向性滑入 — 用于 feat-card:正常卡从左,reverse 卡从右,呼应内容左右布局 */
+/* Directional slide-in — for feat-card: normal cards from the left, reverse cards from the right, matching the left/right content layout */
 .fade-in.slide-l {
     transform: translateY(10px) translateX(-24px);
 }
@@ -1948,7 +1948,7 @@ button.tb-icon.tb-theme:hover {
     transform: translateY(0) translateX(0);
 }
 
-/* 缩放进场 — 用于 quote 大引言 */
+/* Scale-in — for the large quote */
 .fade-in.scale-in {
     transform: translateY(10px) scale(0.97);
 }
@@ -1956,7 +1956,7 @@ button.tb-icon.tb-theme:hover {
     transform: translateY(0) scale(1);
 }
 
-/* [data-stagger] 容器内的子项 — JS 依次赋 transition-delay 后添加 .in */
+/* Children inside a [data-stagger] container — JS assigns transition-delay in turn, then adds .in */
 .stagger-item {
     opacity: 0;
     transform: translateY(12px);
@@ -1969,7 +1969,7 @@ button.tb-icon.tb-theme:hover {
     transform: translateY(0);
 }
 
-/* eyebrow 短横线 — 卡片进场时从 0 宽度画出 */
+/* Eyebrow short line — drawn from 0 width when the card enters */
 .feat-eyebrow::before {
     transition: transform 0.5s ease 0.15s;
     transform: scaleX(0);
@@ -1979,7 +1979,7 @@ button.tb-icon.tb-theme:hover {
     transform: scaleX(1);
 }
 
-/* sec-h2 下划线画入(install 区标题) */
+/* sec-h2 underline draw-in (install section heading) */
 .sec-label .br {
     display: inline-block;
 }
@@ -2000,7 +2000,7 @@ button.tb-icon.tb-theme:hover {
     }
 }
 
-/* ---------- 顶部滚动进度条 ---------- */
+/* ---------- Top scroll progress bar ---------- */
 .scroll-progress {
     position: fixed;
     top: 0;
@@ -2023,7 +2023,7 @@ button.tb-icon.tb-theme:hover {
     }
 }
 
-/* ---------- CTA band(反色带) ---------- */
+/* ---------- CTA band (inverted band) ---------- */
 .cta-band {
     padding: 100px 0;
     text-align: center;

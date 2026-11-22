@@ -187,9 +187,9 @@ const SPACE_BETWEEN_SELECTED_BLOCK_AVATARS: f32 = 2.;
 
 const CLI_SUBAGENT_HORIZONTAL_MARGIN: f32 = 8.;
 const CLI_SUBAGENT_VERTICAL_MARGIN: f32 = 8.;
-// CLI agent 浮窗在普通 block list 中最多接近铺满终端区域，保留少量边缘余量。
+// In a normal block list, the CLI agent floating window can come close to filling the terminal area, leaving a small edge margin.
 const CLI_SUBAGENT_MAX_WIDTH_RATIO: f32 = 0.98;
-// 高度同样接近整窗，但仍受当前 block 可用高度限制。
+// The height is also close to the full window, but is still limited by the currently available block height.
 const CLI_SUBAGENT_MAX_HEIGHT_RATIO: f32 = 0.98;
 
 fn cli_subagent_layout_max_size(
@@ -197,8 +197,8 @@ fn cli_subagent_layout_max_size(
     block_height: f32,
     is_agent_blocked: bool,
 ) -> Vector2F {
-    // 参考 Warp 的外层约束形态：由 block list 先给浮窗足够大的布局上限，
-    // 再交给 CLISubagentView 内部 Resizable 处理最终拖拽尺寸。
+    // Follows Warp's outer constraint shape: the block list first gives the floating window a large enough layout upper bound,
+    // then CLISubagentView's inner Resizable handles the final drag size.
     let max_width = (available_size.x() * CLI_SUBAGENT_MAX_WIDTH_RATIO
         - CLI_SUBAGENT_HORIZONTAL_MARGIN)
         .max(CLI_SUBAGENT_MIN_RESIZABLE_WIDTH);
@@ -206,7 +206,7 @@ fn cli_subagent_layout_max_size(
     let max_height = if is_agent_blocked {
         window_max_height
     } else {
-        // 非 blocked 状态保持 Warp 的 block 内约束，避免非活跃浮窗越出所属 block。
+        // In the non-blocked state keep Warp's in-block constraint, so an inactive floating window does not overflow its block.
         (block_height - CLI_SUBAGENT_VERTICAL_MARGIN * 2.).min(window_max_height)
     }
     .max(0.);
@@ -806,18 +806,18 @@ pub enum VisibleItem {
     },
 }
 
-/// 按事件派发顺序返回当前可见的 RichContent 视图 ID。
+/// Returns the IDs of currently visible RichContent views in event dispatch order.
 fn visible_rich_content_views_for_event_dispatch(
     visible_items: Option<&[VisibleItem]>,
 ) -> Vec<EntityId> {
     let mut view_ids = Vec::new();
 
-    // 只收集可见的 RichContent，普通终端块和间隔不参与子视图事件派发。
+    // Collect only visible RichContent; normal terminal blocks and gaps do not take part in child view event dispatch.
     let Some(visible_items) = visible_items else {
         return view_ids;
     };
-    // RichContent 按列表顺序绘制，越靠后的项越晚绘制；事件派发需要反向遍历，
-    // 这样发生重叠或命中范围贴边时，视觉上更靠上的 block 会先获得鼠标事件。
+    // RichContent is painted in list order, so later items are painted later; event dispatch needs to iterate in reverse,
+    // so that when overlaps occur or hit areas touch an edge, the visually upper block gets the mouse event first.
     for item in visible_items.iter().rev() {
         if let VisibleItem::RichContent { view_id, .. } = item {
             view_ids.push(*view_id);
@@ -827,7 +827,7 @@ fn visible_rich_content_views_for_event_dispatch(
     view_ids
 }
 
-/// 判断 RichContent 处理事件后是否应阻止事件继续落到其他 block 或终端文本。
+/// Decides whether, after RichContent handles an event, the event should be stopped from reaching other blocks or terminal text.
 fn should_stop_after_rich_content_handles_event(event: &Event) -> bool {
     matches!(
         event,

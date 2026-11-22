@@ -1,4 +1,4 @@
-//! 搜索类工具:`Grep`(逐行匹配)+ `FileGlobV2`(文件名通配)。
+//! Search tools: `Grep` (line-by-line matching) + `FileGlobV2` (file name globbing).
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -136,7 +136,7 @@ fn glob_from_args(args: &str) -> Result<api::message::tool_call::Tool> {
                 parsed.search_dir
             },
             max_matches: parsed.limit,
-            max_depth: 0, // 不限深度
+            max_depth: 0, // unlimited depth
             min_depth: 0,
         },
     ))
@@ -156,8 +156,8 @@ fn glob_result_to_json(result: &api::message::tool_call_result::Result) -> Optio
                 .iter()
                 .map(|f| f.file_path.as_str())
                 .collect();
-            // protobuf 中 Success.warnings: String 是 stderr 警告文本(如权限错误)。
-            // 仅在非空时输出,避免给模型噪声。
+            // Success.warnings: String in the protobuf is stderr warning text (e.g. permission errors).
+            // Only output when non-empty, to avoid adding noise for the model.
             let mut value = json!({ "status": "ok", "files": files });
             if !s.warnings.is_empty() {
                 value["warnings"] = json!(s.warnings);

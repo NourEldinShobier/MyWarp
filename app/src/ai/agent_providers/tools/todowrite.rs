@@ -1,28 +1,28 @@
-//! `todowrite` BYOP 工具 descriptor。
+//! `todowrite` BYOP tool descriptor.
 //!
-//! 跟 webfetch / websearch 一样**不**映射到 protobuf executor variant —— 由
-//! `chat_stream.rs` 在 `parse_incoming_tool_call` 之前按 name 拦截,直接合成
-//! `Message::UpdateTodos` 写入 conversation,触发 chip + popup UI 更新。
+//! Like webfetch / websearch, this is **not** mapped to a protobuf executor variant. Instead
+//! `chat_stream.rs` intercepts it by name before `parse_incoming_tool_call` and synthesizes
+//! `Message::UpdateTodos` directly into the conversation, triggering the chip + popup UI update.
 //!
-//! 协议设计对齐 opencode `todowrite`:
-//! - 入参:`{ todos: [{ content, status, priority? }] }`,**全量覆盖式**(每次调用都替换整个 list)
-//! - status:`pending` / `in_progress` / `completed` / `cancelled`
-//! - 客户端按 `content` 算 stable id(SHA-256 前缀,16 hex)避免每次刷新 chip 数字
+//! The protocol follows opencode `todowrite`:
+//! - Args: `{ todos: [{ content, status, priority? }] }`, **full overwrite** (each call replaces the whole list)
+//! - status: `pending` / `in_progress` / `completed` / `cancelled`
+//! - The client computes a stable id from `content` (SHA-256 prefix, 16 hex) so the chip count doesn't flicker on every refresh
 //!
-//! ## emit 策略
+//! ## Emit strategy
 //!
-//! 每次拦截一次 todowrite 调用 → 合成两条 `Message::UpdateTodos`:
-//! 1. `CreateTodoList { initial_todos: [全部 todos] }`(全部进 pending)
-//! 2. `MarkTodosCompleted { todo_ids: [status=completed/cancelled 的 id] }`
+//! Each intercepted todowrite call synthesizes two `Message::UpdateTodos`:
+//! 1. `CreateTodoList { initial_todos: [all todos] }` (all go to pending)
+//! 2. `MarkTodosCompleted { todo_ids: [ids with status=completed/cancelled] }`
 //!
-//! `update_todo_list_from_todo_op` 会把第二条命中的项从 pending 移到 completed
-//! (`mark_todos_complete` 在 pending 里 lookup id),最终 `AIAgentTodoList` 状态:
-//! `completed_items = [completed]`、`pending_items = [pending + in_progress]`。
-//! Warp UI `in_progress_item()` 拿 `pending_items.first()`,所以 in_progress 的
-//! todo 应该是 `todos` 数组里第一个 `status != completed/cancelled` 的项。
+//! `update_todo_list_from_todo_op` moves the items hit by the second message from pending to
+//! completed (`mark_todos_complete` looks up ids in pending). The final `AIAgentTodoList` state:
+//! `completed_items = [completed]`, `pending_items = [pending + in_progress]`.
+//! The Warp UI `in_progress_item()` takes `pending_items.first()`, so the in_progress
+//! todo should be the first item in the `todos` array with `status != completed/cancelled`.
 //!
-//! 然后再合成一对 `Message::ToolCall`(carrier,tool=None) + `Message::ToolCallResult`
-//! 给上游模型 unblock。
+//! Then a `Message::ToolCall` (carrier, tool=None) + `Message::ToolCallResult` pair is
+//! synthesized to unblock the upstream model.
 
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
@@ -43,12 +43,12 @@ pub struct Args {
 #[derive(Debug, Deserialize)]
 pub struct TodoArg {
     pub content: String,
-    /// `pending` | `in_progress` | `completed` | `cancelled`。模型偶发会送别的字符串,
-    /// 解析时按未识别值兜底为 `pending`。
+    /// `pending` | `in_progress` | `completed` | `cancelled`. The model occasionally sends other strings;
+    /// unrecognized values fall back to `pending` when parsing.
     #[serde(default)]
     pub status: String,
-    /// opencode 协议带 priority,Warp 数据模型不区分,这里收下但不用,
-    /// 保留是为了让模型按 opencode 习惯发参数不报错。
+    /// The opencode protocol carries priority; the Warp data model doesn't distinguish it, so it is
+    /// accepted but unused, to keep models that follow opencode conventions from erroring.
     #[serde(default, rename = "priority")]
     pub _priority: Option<String>,
 }
@@ -106,11 +106,11 @@ pub static TODOWRITE: OpenAiTool = OpenAiTool {
     result_to_json,
 };
 
-/// 合成给上游模型看的 todowrite tool_result。
+/// Synthesizes the todowrite tool_result shown to the upstream model.
 ///
-/// `todowrite` 是本地拦截工具,不会产生 `AIAgentAction`,所以必须带
-/// `_byop_intercepted` sentinel。controller 会用这个标记触发 auto-resume,
-/// 让模型在下一轮收到 tool_result 后继续 loop。
+/// `todowrite` is a locally intercepted tool and never produces an `AIAgentAction`, so it must carry
+/// the `_byop_intercepted` sentinel. The controller uses this marker to trigger auto-resume,
+/// so the model keeps looping after receiving the tool_result on the next turn.
 pub fn success_result_to_json(message: &'static str) -> Value {
     json!({
         "_byop_intercepted": true,
@@ -130,13 +130,13 @@ pub fn invalid_arguments_result_to_json(detail: String, received_args: &str) -> 
     })
 }
 
-/// 根据 content 计算稳定 id。模型用同样 content 第二次发 todo 时拿到同一个 id,
-/// 这样 `mark_todos_complete(todo_ids)` 才能在 pending 里命中 → 把它移到 completed。
+/// Computes a stable id from content. When the model sends a todo with the same content again it gets the same id,
+/// so `mark_todos_complete(todo_ids)` can hit it in pending and move it to completed.
 fn stable_id(content: &str) -> String {
     let mut h = Sha256::new();
     h.update(content.as_bytes());
     let bytes = h.finalize();
-    // 取前 8 字节 = 16 hex,够稳够短。
+    // First 8 bytes = 16 hex: stable enough and short enough.
     bytes.iter().take(8).map(|b| format!("{b:02x}")).collect()
 }
 
@@ -152,8 +152,8 @@ fn is_completed_status(s: &str) -> bool {
     matches!(s, "completed" | "cancelled")
 }
 
-/// 合成两条 `Message::UpdateTodos`(创建新 list + mark completed)。
-/// chat_stream 拦截 todowrite 时调用本函数,把返回 messages yield 出去。
+/// Synthesizes two `Message::UpdateTodos` (create new list + mark completed).
+/// chat_stream calls this when it intercepts todowrite and yields the returned messages.
 pub fn build_update_todos_messages(
     args_str: &str,
     task_id: &str,
@@ -162,9 +162,9 @@ pub fn build_update_todos_messages(
     let parsed: Args =
         serde_json::from_str(args_str).map_err(|e| anyhow!("todowrite args parse error: {e}"))?;
 
-    // 全部 todos 进 pending(顺序保持模型给的顺序),这是 CreateTodoList 的入口。
+    // All todos go to pending (keeping the model's order); this is the CreateTodoList input.
     let initial_todos: Vec<api::TodoItem> = parsed.todos.iter().map(to_todo_item).collect();
-    // 然后 mark 那些 status=completed/cancelled 的 id 完成。
+    // Then mark the ids with status=completed/cancelled as done.
     let completed_ids: Vec<String> = parsed
         .todos
         .iter()

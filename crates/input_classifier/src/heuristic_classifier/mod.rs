@@ -41,8 +41,9 @@ pub struct HeuristicClassifier;
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 impl InputClassifier for HeuristicClassifier {
     async fn detect_input_type(&self, input: ParsedTokensSnapshot, context: &Context) -> InputType {
-        // 输入含 CJK 字符直接判 AI:底层词典与 ML 模型皆英文训练,
-        // 中/日/韩文走默认逻辑会被误判为 Shell。
+        // Input containing CJK characters is classified as AI directly: the underlying
+        // dictionary and ML model are trained on English, so Chinese/Japanese/Korean text
+        // would be misclassified as Shell by the default logic.
         if contains_cjk(input.buffer_text.as_str()) {
             return InputType::AI;
         }

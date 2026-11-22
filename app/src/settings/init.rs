@@ -73,7 +73,7 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     GPUSettings::register(ctx);
     GeneralSettings::register(ctx);
     AISettings::register_and_subscribe_to_events(ctx);
-    // Warp Wave 7-3:`AmbientAgentSettings` 随 ambient-agent UI 子系统物理删。
+    // Warp Wave 7-3: `AmbientAgentSettings` was physically deleted along with the ambient-agent UI subsystem.
     ScrollSettings::register(ctx);
     SelectionSettings::register(ctx);
     InputModeSettings::register(ctx);
@@ -129,8 +129,8 @@ pub fn init(
         migrate_native_settings_to_settings_file(ctx);
     }
 
-    // 应用持久化语言设置到 i18n loader。run() 早期已用系统 locale 初始化,此处覆盖到
-    // 用户显式选择;Language::System 时不动。
+    // Apply the persisted language setting to the i18n loader. run() already initialized from the system locale early on; this overrides it with
+    // the user's explicit choice; left untouched for Language::System.
     {
         let lang = *super::language::LanguageSettings::as_ref(ctx).language;
         if let Some(locale) = lang.to_locale_str() {
@@ -213,13 +213,13 @@ pub fn init(
 
     appearance::register(ctx);
 
-    // 全局 HTTP 代理(见 Issue #72):这里只读 NetworkSettings 中的非敏感字段,
-    // 密码从 OS 密钥库读取的 ProxyCredentials 由 `initialize_app` 后期注册后再推。
+    // Global HTTP proxy (see Issue #72): only the non-sensitive NetworkSettings fields are read here;
+    // the password, from the ProxyCredentials in the OS keyring, is pushed later after `initialize_app` registers it.
     apply_network_settings_to_global_slots(ctx, "");
     ctx.subscribe_to_model(&NetworkSettings::handle(ctx), |_model, _event, ctx| {
-        // 变更时密码可能已由 ProxyCredentials 提供。lib.rs 会额外订阅那个
-        // singleton 并推送带 password 的 apply。这里仅推非密码字段,
-        // 保持密码不变即可。
+        // On change the password may already be provided by ProxyCredentials. lib.rs additionally subscribes to that
+        // singleton and pushes an apply that includes the password. Here only non-password fields are pushed,
+        // leaving the password unchanged.
         crate::settings::reapply_network_settings_preserving_password(ctx);
     });
 
@@ -240,14 +240,14 @@ pub fn init(
     user_defaults_on_startup
 }
 
-/// 读取当前 `NetworkSettings` + 外部传入的 `password`,同时更新
-/// `http_client::set_global_proxy_config` 与 `websocket::set_global_proxy_config`,
-/// 使两者保持同一代理语义(见 Issue #72)。
+/// Reads the current `NetworkSettings` plus the externally supplied `password`, and updates both
+/// `http_client::set_global_proxy_config` and `websocket::set_global_proxy_config`,
+/// so both keep the same proxy semantics (see Issue #72).
 ///
-/// 密码参数是以 `&str` 传入而不是从 `ProxyCredentials` 的 singleton 里读,是为了
-/// 避免该 singleton 在 settings::init 阶段还未注册。调用方责任:启动早期传
-/// 空串(后续 UI / ProxyCredentials 事件会重推),后期传真实密码。重建已有
-/// `Client` 实例是调用方责任。
+/// The password is passed in as `&str` rather than read from the `ProxyCredentials` singleton, to
+/// avoid the singleton not being registered yet during the settings::init phase. Caller responsibility: pass an
+/// empty string early at startup (later UI / ProxyCredentials events re-push it), and the real password later. Rebuilding existing
+/// `Client` instances is the caller's responsibility.
 pub(crate) fn apply_network_settings_to_global_slots(ctx: &mut AppContext, password: &str) {
     use super::network::NetworkSettings;
     let net = NetworkSettings::as_ref(ctx);
@@ -272,8 +272,8 @@ pub(crate) fn apply_network_settings_to_global_slots(ctx: &mut AppContext, passw
     });
 }
 
-/// 在 `initialize_app` 之后(`ProxyCredentials` 已注册)调用:读当前密码后重推
-/// 全局代理设置。也用于 NetworkSettings 变更订阅以保持密码不丢。
+/// Call after `initialize_app` (once `ProxyCredentials` is registered): read the current password and re-push the
+/// global proxy settings. Also used by the NetworkSettings change subscription so the password is not lost.
 pub(crate) fn reapply_network_settings_preserving_password(ctx: &mut AppContext) {
     use super::network_secrets::ProxyCredentials;
     let password = ProxyCredentials::as_ref(ctx).password().to_string();

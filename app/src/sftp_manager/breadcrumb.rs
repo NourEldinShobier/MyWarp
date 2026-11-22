@@ -1,6 +1,6 @@
-//! 面包屑导航渲染组件
+//! Breadcrumb navigation rendering component
 //!
-//! 根据当前路径渲染可点击的面包屑导航，支持逐段导航到上级路径。
+//! Renders a clickable breadcrumb navigation for the current path, supporting segment-by-segment navigation to parent paths.
 //! author: logic
 //! date: 2026-05-26
 
@@ -14,10 +14,10 @@ use warpui::Element;
 use crate::sftp_manager::browser::SftpBrowserAction;
 use crate::ui_components::icons::Icon;
 
-/// 渲染路径面包屑导航
+/// Render the path breadcrumb navigation
 ///
-/// 遍历路径的各个组件，每段可点击触发 NavigateTo 动作。
-/// 段之间用 ChevronRight 图标分隔，空路径显示 "/"。
+/// Iterates over the path components; each segment can be clicked to trigger a NavigateTo action.
+/// Segments are separated by a ChevronRight icon; an empty path shows "/".
 pub fn render_breadcrumb(current_path: &PathBuf, appearance: &Appearance) -> Vec<Box<dyn Element>> {
     let theme = appearance.theme();
     let text_color = theme.active_ui_text_color();
@@ -30,7 +30,7 @@ pub fn render_breadcrumb(current_path: &PathBuf, appearance: &Appearance) -> Vec
         .filter(|c| !matches!(c, Component::RootDir))
         .collect();
 
-    // 空路径或只有根路径时只显示 "/"
+    // For an empty path or only the root path, show only "/"
     if components.is_empty() {
         let root_el = Text::new_inline(String::from("/"), ui_font, ui_font_size)
             .with_color(text_color.into())
@@ -45,7 +45,7 @@ pub fn render_breadcrumb(current_path: &PathBuf, appearance: &Appearance) -> Vec
         accumulated.push(comp);
         let is_last = i == components.len() - 1;
 
-        // 分隔符（第一段之后添加）
+        // Separator (added after the first segment)
         if i > 0 {
             let sep_icon = ConstrainedBox::new(
                 Icon::ChevronRight
@@ -67,13 +67,13 @@ pub fn render_breadcrumb(current_path: &PathBuf, appearance: &Appearance) -> Vec
         let target_path = accumulated.clone();
 
         if is_last {
-            // 最后一段用高亮色，不可点击
+            // The last segment uses the highlight color and is not clickable
             let text_el = Text::new_inline(segment_label, ui_font, ui_font_size)
                 .with_color(text_color.into())
                 .finish();
             elements.push(Container::new(text_el).finish());
         } else {
-            // 非最后一段可点击导航
+            // Non-last segments are clickable for navigation
             let label_for_closure = segment_label.clone();
             let path = accumulated.display();
             let position_id = format!("sftp_breadcrumb:{path}");

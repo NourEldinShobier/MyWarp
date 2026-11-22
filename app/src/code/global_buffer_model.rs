@@ -211,14 +211,14 @@ impl GlobalBufferModel {
         }
     }
 
-    /// 客户端 app 专用:订阅 `RemoteServerManager` 的 buffer push 事件,把远端
-    /// daemon 推来的 `BufferUpdated` 应用到本地 Remote buffer。
+    /// Client app only: subscribes to `RemoteServerManager` buffer push events and applies the
+    /// `BufferUpdated` pushed by the remote daemon to the local Remote buffer.
     ///
-    /// 必须由客户端 app 在注册 `GlobalBufferModel` 时显式调用 —— **不能**放进
-    /// `new()`:remote-server daemon 同样会注册 `GlobalBufferModel`(用于
-    /// ServerLocal buffer 的服务端同步),但 daemon 不注册 `RemoteServerManager`,
-    /// 若在 `new()` 里 `RemoteServerManager::handle()` 会 panic「never registered」
-    /// 导致 daemon 一启动就崩。
+    /// Must be called explicitly by the client app when it registers `GlobalBufferModel`; it must **not** go in
+    /// `new()`: the remote-server daemon also registers `GlobalBufferModel` (for server-side sync of
+    /// ServerLocal buffers), but the daemon does not register `RemoteServerManager`, so
+    /// calling `RemoteServerManager::handle()` in `new()` would panic with "never registered"
+    /// and the daemon would crash right at startup.
     #[cfg(feature = "local_tty")]
     pub fn subscribe_to_remote_server_manager(ctx: &mut ModelContext<Self>) {
         use remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
@@ -232,8 +232,8 @@ impl GlobalBufferModel {
                 edits,
             } = event
             {
-                // wire offset 是 1-indexed char offset(对齐 CharOffset)。
-                // 用饱和转换避免 32-bit 平台 `as usize` 截断高位;native 64-bit 上等价。
+                // The wire offset is a 1-indexed char offset (aligned with CharOffset).
+                // Use a saturating conversion to avoid `as usize` truncating high bits on 32-bit platforms; equivalent on native 64-bit.
                 let char_edits: Vec<_> = edits
                     .iter()
                     .map(|e| CharOffsetEdit {
@@ -314,18 +314,18 @@ impl GlobalBufferModel {
         }
     }
 
-    /// 主动关闭一个 buffer:从客户端 map 中移除,远端 buffer 额外发
-    /// `CloseBuffer` 让 daemon 释放内存 buffer。
+    /// Actively closes a buffer: removes it from the client map, and for a remote buffer additionally sends
+    /// `CloseBuffer` so the daemon frees the in-memory buffer.
     ///
-    /// 不依赖 `WeakHandle` 是否失效——`remove_deallocated_buffers` 仅在 handle
-    /// 已被 drop 时清理,而 tab 关闭路径里 buffer 通常仍有强引用(`TabData`
-    /// 持有 `LocalCodeEditorView` 间接强引用 `Buffer`)。如果不主动清理,
-    /// 关 tab 后 `InternalBufferState` 残留,下次打开同一远端文件会走
-    /// `open_remote_buffer` 的 "Return existing buffer if already open" 分支
-    /// 复用包含未保存编辑的旧 buffer,造成"看着已保存"的假象。
+    /// Does not depend on whether the `WeakHandle` has expired: `remove_deallocated_buffers` only cleans up when the handle
+    /// has been dropped, but on the tab-close path the buffer usually still has strong references (`TabData`
+    /// holds `LocalCodeEditorView`, which indirectly holds `Buffer`). Without active cleanup,
+    /// `InternalBufferState` lingers after the tab closes, and the next open of the same remote file would take the
+    /// "Return existing buffer if already open" branch of `open_remote_buffer` and
+    /// reuse the old buffer containing unsaved edits, creating the illusion that it was already saved.
     #[cfg_attr(not(feature = "local_tty"), allow(unused_variables))]
     pub fn close_buffer(&mut self, file_id: FileId, ctx: &mut ModelContext<Self>) {
-        // 远端 buffer:发 CloseBuffer 让 daemon 释放内存 buffer。
+        // Remote buffer: send CloseBuffer so the daemon frees the in-memory buffer.
         #[cfg(feature = "local_tty")]
         if let Some(state) = self.buffers.get(&file_id) {
             if let BufferSource::Remote { remote_path, .. } = &state.source {
@@ -815,7 +815,7 @@ impl GlobalBufferModel {
     }
 
     /// Shared helper: register `buffer` under `path` with FileModel and store internal state.
-    /// LSP 下线后不再试图跟 LSP 同步 buffer 变更。
+    /// After the LSP goes offline, no longer try to sync buffer changes with it.
     #[cfg(feature = "local_fs")]
     fn register_buffer_for_path(
         &mut self,
@@ -1037,9 +1037,9 @@ impl GlobalBufferModel {
         }
 
         let file_id = FileId::new();
-        // TODO(ssh-remote): buffer 在初始内容(OpenBufferResponse)到达前即可编辑,
-        // 加载窗口内的用户编辑会被 replace_all() 覆盖丢失。需在 Buffer/编辑器层
-        // 增加 read-only 支持后,在 sync_clock=None 期间锁定该 buffer。
+        // TODO(ssh-remote): the buffer is editable before the initial content (OpenBufferResponse) arrives,
+        // so user edits made during the loading window get overwritten by replace_all(). After adding read-only support
+        // at the Buffer/editor layer, lock the buffer while sync_clock=None.
         let buffer = ctx.add_model(|_| Buffer::default());
 
         // Store state with sync_clock = None (set to Some on OpenBufferResponse).
@@ -1115,8 +1115,8 @@ impl GlobalBufferModel {
                                 }
                             })
                             .collect();
-                        // 投递失败说明连接已死,daemon 收不到这次编辑而本地
-                        // buffer 已推进 —— 标记为冲突,触发 UI 重新同步。
+                        // A delivery failure means the connection is dead; the daemon will not receive this edit while the local
+                        // buffer has already advanced, so mark it as a conflict and trigger a UI resync.
                         if let Err(e) = client.send_buffer_edit(
                             path_for_edit.clone(),
                             expected_sv,
@@ -1136,7 +1136,7 @@ impl GlobalBufferModel {
             let manager = remote_server::manager::RemoteServerManager::handle(ctx);
             let Some(client) = manager.as_ref(ctx).client_for_host(&host_id).cloned() else {
                 log::warn!("No remote server client for host {host_id:?}");
-                // 清理失败的 file_id,使后续重试能重新发送 OpenBuffer。
+                // Clear the failed file_id so a later retry can resend OpenBuffer.
                 self.cleanup_file_id(file_id, ctx);
                 ctx.emit(GlobalBufferModelEvent::FailedToLoad {
                     file_id,
@@ -1175,7 +1175,7 @@ impl GlobalBufferModel {
                     }
                     Err(error) => {
                         log::warn!("Failed to open remote buffer: {error}");
-                        // 清理失败的 file_id,使后续重试能重新发送 OpenBuffer。
+                        // Clear the failed file_id so a later retry can resend OpenBuffer.
                         me.cleanup_file_id(file_id, ctx);
                         ctx.emit(GlobalBufferModelEvent::FailedToLoad {
                             file_id,
@@ -1346,7 +1346,7 @@ impl GlobalBufferModel {
         buffer.update(ctx, |buffer, ctx| {
             for edit in edits {
                 let max_offset = buffer.max_charoffset();
-                // wire offset 饱和转换 + clamp 到 buffer 末尾,双重防御。
+                // Saturating wire offset conversion + clamp to the buffer end, as double defense.
                 let start = CharOffset::from(
                     usize::try_from(edit.start_offset)
                         .unwrap_or(usize::MAX)
@@ -1384,7 +1384,7 @@ impl GlobalBufferModel {
             return Err(FileSaveError::RemoteError("Buffer deallocated".to_string()));
         };
         let content = buffer.as_ref(ctx).text().into_string();
-        // 使用 buffer 当前版本,避免与 daemon 的版本同步错位。
+        // Use the buffer's current version to avoid getting out of step with the daemon's version sync.
         let version = buffer.as_ref(ctx).version();
         FileModel::handle(ctx).update(ctx, |file_model, ctx| {
             file_model.save(file_id, content, version, ctx)
@@ -1407,8 +1407,8 @@ impl GlobalBufferModel {
         };
 
         if let BufferSource::ServerLocal { sync_clock, .. } = &mut state.source {
-            // 拒绝过期的冲突解决:若服务端版本在客户端看到冲突后又变化,
-            // 强行覆盖会丢掉更新的服务端编辑。
+            // Reject stale conflict resolutions: if the server version changed after the client saw the conflict,
+            // forcing an overwrite would discard the newer server-side edits.
             if sync_clock.server_version != acknowledged_server_version {
                 return Err(FileSaveError::RemoteError(
                     "Stale conflict resolution".to_string(),
@@ -1434,8 +1434,8 @@ impl GlobalBufferModel {
 
         // Save to disk. Note: the buffer content has already been replaced
         // in memory above. If the save fails, memory and disk will diverge.
-        // 使用 buffer 当前版本,且在保存成功(FileSaved 回调)前不更新
-        // base_content_version,避免与 daemon 版本同步错位。
+        // Use the buffer's current version, and do not update base_content_version until the save succeeds
+        // (the FileSaved callback), to avoid getting out of step with the daemon's version sync.
         let content = client_content.to_string();
         let save_version = buffer.as_ref(ctx).version();
         FileModel::handle(ctx).update(ctx, |file_model, ctx| {
@@ -1469,10 +1469,10 @@ impl GlobalBufferModel {
             .is_some_and(|state| matches!(state.source, BufferSource::ServerLocal { .. }))
     }
 
-    /// 该 buffer 是否是客户端 `Remote` buffer(远端 SSH 文件)。
+    /// Whether this buffer is a client `Remote` buffer (a remote SSH file).
     ///
-    /// 编辑器保存时用它判断:远端文件不能走本地 `FileModel`(无本地路径,
-    /// 会得到 `NoFilePath`),必须走 buffer-sync 的 `SaveBuffer` 协议。
+    /// The editor uses this on save: a remote file cannot go through the local `FileModel` (it has no local path
+    /// and would get `NoFilePath`), and must use the buffer-sync `SaveBuffer` protocol.
     #[cfg(feature = "local_tty")]
     pub fn is_remote(&self, file_id: FileId) -> bool {
         self.buffers
@@ -1480,17 +1480,17 @@ impl GlobalBufferModel {
             .is_some_and(|state| matches!(state.source, BufferSource::Remote { .. }))
     }
 
-    /// 客户端:把远端 buffer 的当前内容持久化到 daemon 端磁盘。
+    /// Client: persists the current content of a remote buffer to disk on the daemon side.
     ///
-    /// daemon 的内存 buffer 已经通过 `BufferEdit`(见 `open_remote_buffer` 里对
-    /// `ContentChanged` 的订阅)实时同步过用户编辑,这里只需发一个 `SaveBuffer`
-    /// 触发 daemon 落盘。请求成功后 emit `FileSaved`,让编辑器/标签更新已保存状态。
+    /// The daemon's in-memory buffer has already received the user's edits in real time via `BufferEdit` (see the subscription to
+    /// `ContentChanged` in `open_remote_buffer`), so here we only need to send one `SaveBuffer`
+    /// to make the daemon write to disk. After the request succeeds, emit `FileSaved` so the editor/tab updates its saved state.
     #[cfg(feature = "local_tty")]
     pub fn save_remote_buffer(&self, file_id: FileId, ctx: &mut ModelContext<Self>) {
         let Some(BufferLocation::Remote(remote_path)) =
             self.location_to_id.get_by_right(&file_id).cloned()
         else {
-            log::warn!("save_remote_buffer: file_id {file_id:?} 不是 Remote buffer");
+            log::warn!("save_remote_buffer: file_id {file_id:?} is not a Remote buffer");
             return;
         };
         let host_id = remote_path.host_id.clone();
@@ -1498,8 +1498,8 @@ impl GlobalBufferModel {
 
         let manager = remote_server::manager::RemoteServerManager::handle(ctx);
         let Some(client) = manager.as_ref(ctx).client_for_host(&host_id).cloned() else {
-            log::warn!("save_remote_buffer: host {host_id:?} 无 remote server client");
-            // 通知编辑器保存失败,避免停留在虚假的“已保存”状态。
+            log::warn!("save_remote_buffer: host {host_id:?} has no remote server client");
+            // Notify the editor that the save failed, so it does not stay in a false "saved" state.
             ctx.emit(GlobalBufferModelEvent::FailedToSave {
                 file_id,
                 error: Rc::new(FileSaveError::RemoteError(format!(
@@ -1524,7 +1524,7 @@ impl GlobalBufferModel {
                             ctx.emit(GlobalBufferModelEvent::FileSaved { file_id });
                         }
                         Some(SaveResult::Error(err)) => {
-                            // 把远端保存失败上抛给编辑器,显示失败提示。
+                            // Propagate the remote save failure to the editor so it shows a failure notice.
                             ctx.emit(GlobalBufferModelEvent::FailedToSave {
                                 file_id,
                                 error: Rc::new(FileSaveError::RemoteError(err.message)),
@@ -1533,7 +1533,7 @@ impl GlobalBufferModel {
                     }
                 }
                 Err(error) => {
-                    // 传输/协议错误同样上抛给编辑器。
+                    // Transport/protocol errors are likewise propagated to the editor.
                     ctx.emit(GlobalBufferModelEvent::FailedToSave {
                         file_id,
                         error: Rc::new(FileSaveError::RemoteError(format!(

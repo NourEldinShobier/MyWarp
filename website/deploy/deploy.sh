@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Zap 官网部署脚本(在服务器上执行)
+# Zap website deploy script (runs on the server)
 #
-# 场景:站点由 1Panel 托管,nginx root 固定指向站点目录(例如
-#   /opt/1panel/www/sites/zap.zerx.dev/index),无法改 root 用 symlink 方案。
-# 故这里做"原子目录替换":CI 已把最新产物 rsync 到 <site>/.incoming,
-# 本脚本把 .incoming 重命名为正式 index 目录,并保留上一版用于回滚。
+# Scenario: the site is hosted by 1Panel and the nginx root is fixed to the site directory (e.g.
+#   /opt/1panel/www/sites/zap.zerx.dev/index), so the symlink approach (changing root) is not possible.
+# So this script does an "atomic directory swap": CI has already rsynced the latest build to <site>/.incoming,
+# and this script renames .incoming to the live index directory, keeping the previous version for rollback.
 #
-# 约定布局($DEPLOY_PATH = 站点 index 目录,例如 .../zap.zerx.dev/index):
-#   <parent>/.incoming   ← CI rsync 推上来的最新 dist 内容
-#   <parent>/index       ← nginx 实际服务的目录(= $DEPLOY_PATH)
-#   <parent>/.index.bak  ← 上一版,用于回滚
+# Layout convention ($DEPLOY_PATH = site index directory, e.g. .../zap.zerx.dev/index):
+#   <parent>/.incoming   ← latest dist contents pushed by CI rsync
+#   <parent>/index       ← directory actually served by nginx (= $DEPLOY_PATH)
+#   <parent>/.index.bak  ← previous version, for rollback
 set -euo pipefail
 
-# $DEPLOY_PATH 由调用方(SSH 命令)以第一个参数传入,即正式 index 目录
-INDEX="${1:?用法: deploy.sh <site-index-dir>}"
+# $DEPLOY_PATH is passed in by the caller (SSH command) as the first argument, i.e. the live index directory
+INDEX="${1:?usage: deploy.sh <site-index-dir>}"
 PARENT="$(dirname "$INDEX")"
 INCOMING="$PARENT/.incoming"
 BACKUP="$PARENT/.index.bak"
@@ -21,20 +21,20 @@ BACKUP="$PARENT/.index.bak"
 log() { printf '[deploy] %s\n' "$*"; }
 
 if [ ! -d "$INCOMING" ] || [ -z "$(ls -A "$INCOMING" 2>/dev/null)" ]; then
-  log "错误:$INCOMING 不存在或为空,没有可发布的产物(先由 CI rsync 到 .incoming)。"
+  log "error: $INCOMING does not exist or is empty, nothing to publish (CI must rsync to .incoming first)."
   exit 1
 fi
 
-# 删除上一版备份,把当前 index 移为备份(若存在)
+# Remove the previous backup and move the current index to backup (if it exists)
 if [ -e "$INDEX" ]; then
-  log "备份当前版本 -> $BACKUP"
+  log "backing up current version -> $BACKUP"
   rm -rf "$BACKUP"
   mv -Tf "$INDEX" "$BACKUP"
 fi
 
-# 原子上线:rename .incoming -> index(同一文件系统,mv 为原子操作)
-log "发布新版本 -> $INDEX"
+# Atomic go-live: rename .incoming -> index (same filesystem, mv is atomic)
+log "publishing new version -> $INDEX"
 mv -Tf "$INCOMING" "$INDEX"
 
-log "完成。当前服务目录:$INDEX"
-log "如需回滚:rm -rf '$INDEX' && mv -Tf '$BACKUP' '$INDEX'"
+log "done. Current serving directory: $INDEX"
+log "to roll back: rm -rf '$INDEX' && mv -Tf '$BACKUP' '$INDEX'"

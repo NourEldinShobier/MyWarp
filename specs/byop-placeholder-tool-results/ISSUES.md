@@ -1,6 +1,6 @@
 # BYOP Placeholder Tool Results Local Issues
 
-本文件记录 `$to-issues` 已确认的本地 implementation issues。它们不发布到 GitHub。
+This file records the local implementation issues confirmed by `$to-issues`. They are not published to GitHub.
 
 Source artifacts:
 
@@ -9,7 +9,7 @@ Source artifacts:
 - `specs/byop-placeholder-tool-results/TECH.md`
 - `specs/byop-placeholder-tool-results/ADR.md`
 
-## BYOP-PR-1: BYOP Request Readiness 核心分类器
+## BYOP-PR-1: BYOP Request Readiness core classifier
 
 Type: AFK
 
@@ -32,7 +32,7 @@ This slice must not wire controller preflight or serializer dispatch behavior ye
 
 None - can start immediately.
 
-## BYOP-PR-2: Serializer 阻断普通流程缺失 Tool Result
+## BYOP-PR-2: Serializer blocks normal flow with missing Tool Result
 
 Type: AFK
 
@@ -55,7 +55,7 @@ This slice keeps explicit history repair unavailable until the repair sidecar sl
 
 - BYOP-PR-1
 
-## BYOP-PR-3: Repair Sidecar 与 Accepted History Repair
+## BYOP-PR-3: Repair Sidecar and Accepted History Repair
 
 Type: AFK
 
@@ -79,7 +79,7 @@ Add durable BYOP repair metadata and allow Placeholder Tool Results only for exp
 - BYOP-PR-1
 - BYOP-PR-2
 
-## BYOP-PR-4: User Continuation 取消路径提交真实 Cancellation Result
+## BYOP-PR-4: User Continuation cancel path commits a real Cancellation Result
 
 Type: AFK
 
@@ -101,7 +101,7 @@ Add controller preflight behavior for the user-continuation case where a prior M
 - BYOP-PR-1
 - BYOP-PR-2
 
-## BYOP-PR-5: Finished Result Drain 与 Auto-Resume Readiness
+## BYOP-PR-5: Finished Result Drain and Auto-Resume Readiness
 
 Type: AFK
 
@@ -125,7 +125,7 @@ Extend controller preflight to drain finished action results and coordinate pend
 - BYOP-PR-2
 - BYOP-PR-4
 
-## BYOP-PR-6: Fork/Legacy Restore 创建 Repair Records
+## BYOP-PR-6: Fork/Legacy Restore creates Repair Records
 
 Type: AFK
 
@@ -148,7 +148,7 @@ Review note: no current legacy restore/conversion input in this checkout proves 
 
 - BYOP-PR-3
 
-## BYOP-PR-7: Blocked Request Error 与 Readiness Logs
+## BYOP-PR-7: Blocked Request Error and Readiness Logs
 
 Type: AFK
 
@@ -174,7 +174,7 @@ Add user-visible blocked-request behavior and non-sensitive readiness diagnostic
 - BYOP-PR-4
 - BYOP-PR-5
 
-## BYOP-PR-8: Placeholder-Then-Cancellation 回归与 Strict Ordering Harness
+## BYOP-PR-8: Placeholder-Then-Cancellation regression and Strict Ordering Harness
 
 Type: AFK
 
@@ -184,7 +184,7 @@ Add end-to-end regression coverage for the observed placeholder-then-cancellatio
 
 ## Acceptance criteria
 
-- [x] A synthetic regression fixture reproduces the structure where one request previously would have contained `(tool 执行结果未保留)` before a later request saw the real cancellation result.
+- [x] A synthetic regression fixture reproduces the structure where one request previously would have contained `(tool result not retained)` before a later request saw the real cancellation result.
 - [x] The same fixture now proves the immediate BYOP request is blocked, waits, or contains a real Cancellation Result, depending on controller state, but never sends a normal-flow Placeholder Tool Result.
 - [x] Strict Chat Completions ordering helper validates generated request bodies for orphan tools, duplicate tool results, and pending tool calls before user/assistant messages.
 - [x] Tests cover accepted repair placeholders, including structured JSON semantics and outbound-only behavior.

@@ -72,18 +72,18 @@ pub(super) fn run_daemon_app(
         ctx.add_singleton_model(|_ctx| DetectedRepositories::default());
         ctx.add_singleton_model(RepoMetadataModel::new_with_incremental_updates);
         ctx.add_singleton_model(warp_files::FileModel::new);
-        // GlobalBufferModel 必须在 ServerModel 之前注册:buffer-sync 的服务端
-        // 处理(server_model.rs / server_buffer_tracker.rs)通过
-        // `GlobalBufferModel::handle(ctx)` 访问它,未注册会在 daemon 启动时
-        // panic「Cannot get singleton model ... never registered」。它自身
-        // 在 `new()` 里订阅 FileModel,所以排在 FileModel 之后。
+        // GlobalBufferModel must be registered before ServerModel: the buffer-sync server-side
+        // handling (server_model.rs / server_buffer_tracker.rs) accesses it through
+        // `GlobalBufferModel::handle(ctx)`, and if it is not registered the daemon would
+        // panic at startup with "Cannot get singleton model ... never registered". It itself
+        // subscribes to FileModel in `new()`, so it is ordered after FileModel.
         ctx.add_singleton_model(crate::code::global_buffer_model::GlobalBufferModel::new);
         ctx.add_singleton_model(server_model_init);
     })?;
     Ok(())
 }
 
-// Warp Wave 6-1:`wire_auth_token_rotation` 函数物理删 — 原订阅 server API
-// token rotation 事件并转发到 `RemoteServerManager::rotate_auth_token`。Wave 3-1
-// 删 auth 子系统后该事件 0 emit 点,Wave 6-1 同步删事件 + 本订阅函数 + `lib.rs`
-// 中的调用点。`RemoteServerManager::rotate_auth_token` 函数本体暂保留。
+// Warp Wave 6-1: the `wire_auth_token_rotation` function is physically deleted. It subscribed to the server API
+// token rotation event and forwarded it to `RemoteServerManager::rotate_auth_token`. After Wave 3-1
+// deleted the auth subsystem that event had 0 emit sites; Wave 6-1 also deletes the event, this subscription function, and the call site in `lib.rs`.
+// The body of `RemoteServerManager::rotate_auth_token` is kept for now.

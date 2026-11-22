@@ -180,28 +180,28 @@ impl CLISubagentController {
                     .and_then(|result| snapshot_block_id_for_action_result(&result.result))
                     .cloned();
 
-                // Warp BYOP fallback: agent 自起 LRC 后,上游 server 路径会推
-                // `BlocklistAIHistoryEvent::CreatedSubtask` 触发
-                // `handle_history_model_event` 把 block 升级为 monitored 态;BYOP 没有
-                // 这条 server 事件源,如果不补,active_block 永远停在
+                // Warp BYOP fallback: after the agent starts an LRC itself, the upstream server path pushes
+                // `BlocklistAIHistoryEvent::CreatedSubtask`, which triggers
+                // `handle_history_model_event` to upgrade the block to the monitored state; BYOP has
+                // no such server event source, and without this fallback active_block stays forever at
                 // `Agent { long_running_control_state: None }` —— `is_agent_in_control()`
-                // / `is_agent_monitoring()` / `is_agent_tagged_in()` 全 false,命中
-                // `view.rs:6841-6853` `is_input_box_visible` 长命令分支的兜底 false 路径,
-                // 输入框消失;同时 `controller.rs:1112-1119` 分支读
-                // `subagent_task_id`,fallback 若不真实创建 conversation task,下一轮
-                // query 路由失败,触发"Could not find conversation for response stream"。
+                // / `is_agent_monitoring()` / `is_agent_tagged_in()` are all false, hitting the
+                // fallback false path of the long-command branch of `is_input_box_visible` at `view.rs:6841-6853`,
+                // so the input box disappears; also, the branch at `controller.rs:1112-1119` reads
+                // `subagent_task_id`, and if the fallback does not actually create a conversation task, the next
+                // query fails to route, triggering "Could not find conversation for response stream".
                 //
-                // 实现走 silent 路径:`create_silent_cli_subagent_task_for_conversation`
-                // 真实创建 subtask 但不 emit `CreatedSubtask`(原方法 emit 时机由调用方
-                // 控制),让本 hook 在升级 block 后再手动 emit。这样可以走完整的上游
-                // 升级链路并创建 SubagentView 浮窗,且配合 `cli.rs:431-446` 的 root_task
-                // 兜底,task 暂无 exchange 时 view 用 root last_exchange 占位创建,后续
-                // 用户 follow-up query 路由到 subtask 触发 `AppendedExchange`,view 自身
-                // 订阅(`cli.rs:355-399`)会自动 replace model 到真实 exchange。
+                // The implementation takes the silent path: `create_silent_cli_subagent_task_for_conversation`
+                // really creates the subtask but does not emit `CreatedSubtask` (the original method's emit timing is
+                // controlled by the caller), so this hook emits manually after upgrading the block. This runs the full upstream
+                // upgrade chain and creates the SubagentView floating window; together with the root_task
+                // fallback at `cli.rs:431-446`, when the task has no exchange yet the view is created with the root last_exchange as a placeholder, and later
+                // when a user follow-up query is routed to the subtask and triggers `AppendedExchange`, the view itself
+                // subscribes (`cli.rs:355-399`) and automatically replaces its model with the real exchange.
                 //
-                // 副作用:浮窗创建瞬间用 root last_exchange 渲染,可能短暂闪现 root 内容
-                // 一帧;但 `set_agent_interaction_mode_for_agent_monitored_command` 升级
-                // 后 SubagentView 的过滤会让其只显示 task_id 关联内容,体验上和上游一致。
+                // Side effect: at the moment the floating window is created it renders the root last_exchange, which may briefly flash root content
+                // for one frame; but after `set_agent_interaction_mode_for_agent_monitored_command` upgrades,
+                // the SubagentView filter shows only task_id-related content, so the experience matches upstream.
                 let upgrade_target = snapshot_block_id.as_ref().and_then(|block_id| {
                     let terminal_model = me.terminal_model.lock();
                     let block = terminal_model.block_list().block_with_id(block_id)?;
@@ -305,15 +305,15 @@ impl CLISubagentController {
                     });
                 }
 
-                // Warp BYOP: silent_create_for_byop 不 emit CreatedSubtask,这里手动
-                // 触发 SpawnedSubagent 让 terminal_view 创建 CLISubagentView 浮窗。
-                // active_subagents_by_block.task_id 同步更新,确保 BlockCompleted 钩子在
-                // LRC 结束时正确清理。
+                // Warp BYOP: silent_create_for_byop does not emit CreatedSubtask, so SpawnedSubagent is triggered
+                // manually here so terminal_view creates the CLISubagentView floating window.
+                // active_subagents_by_block.task_id is updated in sync, ensuring the BlockCompleted hook cleans up
+                // correctly when the LRC ends.
                 //
-                // 注意:terminal_model 锁已在上面 drop,避免之前 reproduce 的死锁(emit
+                // Note: the terminal_model lock is already dropped above, avoiding the deadlock reproduced earlier (emit
                 // SpawnedSubagent → terminal_view::handle_cli_subagent_controller_event
-                // → CLISubagentView::new 同步内部还会再 lock terminal_model 之类导致
-                // FairMutex 重入)。
+                // → CLISubagentView::new internally locks terminal_model again, causing
+                // FairMutex re-entry).
                 if let Some((block_id, task_id, conversation_id, action_id)) = emit_spawn_event_for
                 {
                     me.active_subagents_by_block

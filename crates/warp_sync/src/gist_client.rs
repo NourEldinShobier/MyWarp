@@ -1,4 +1,4 @@
-//! Gist API 客户端
+//! Gist API client
 //!
 // author: logic
 // date: 2026-05-24
@@ -11,14 +11,14 @@ use thiserror::Error;
 
 const GIST_DESCRIPTION: &str = "WARP_CONFIG";
 const GIST_FILENAME: &str = "warp_config.json";
-/// HTTP 整体请求超时（含 connect + read），避免网络挂起让 UI 永远卡在 Syncing
+/// Overall HTTP request timeout (connect + read), so a hung network does not leave the UI stuck on Syncing forever
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-/// find_gist 翻页上限。100/page,上限 20 页 = 2000 个 gist 已远超任何正常用户需要;
-/// 超过则提早返回 None,避免 API 分页 quirk 引起死循环 / 触发 rate limit
+/// Page limit for find_gist. 100 per page, up to 20 pages = 2000 gists, far more than any normal user needs;
+/// beyond that it returns None early, avoiding infinite loops / rate limits from API pagination quirks
 const FIND_GIST_MAX_PAGES: u32 = 20;
 
-/// Gist API 客户端错误
+/// Gist API client error
 #[derive(Debug, Error)]
 pub enum GistClientError {
     #[error("Network request failed: {0}")]
@@ -31,33 +31,33 @@ pub enum GistClientError {
     Api { status: u16, body: String },
 }
 
-/// Gist 操作 trait，支持真实客户端和测试 mock
+/// Gist operations trait, supporting the real client and test mocks
 pub trait GistOps: Send + Sync {
-    /// 验证 Token 是否有效，返回用户名
+    /// Validates the token and returns the username
     fn validate_token(&self, platform: SyncPlatform, token: String) -> impl std::future::Future<Output = Result<String, GistClientError>> + Send;
 
-    /// 查找 description 为 WARP_CONFIG 的 Gist
+    /// Finds the Gist whose description is WARP_CONFIG
     fn find_gist(&self, platform: SyncPlatform, token: String) -> impl std::future::Future<Output = Result<Option<String>, GistClientError>> + Send;
 
-    /// 创建新 Gist
+    /// Creates a new Gist
     fn create_gist(&self, platform: SyncPlatform, token: String, content: String) -> impl std::future::Future<Output = Result<String, GistClientError>> + Send;
 
-    /// 更新已有 Gist
+    /// Updates an existing Gist
     fn update_gist(&self, platform: SyncPlatform, token: String, gist_id: String, content: String) -> impl std::future::Future<Output = Result<(), GistClientError>> + Send;
 
-    /// 获取 Gist 文件内容
+    /// Gets Gist file content
     fn get_gist_content(&self, platform: SyncPlatform, token: String, gist_id: String) -> impl std::future::Future<Output = Result<String, GistClientError>> + Send;
 }
 
-/// Gist API 客户端，支持 GitHub 和 Gitee
+/// Gist API client, supporting GitHub and Gitee
 pub struct GistClient {
     client: Client,
 }
 
 impl GistClient {
-    /// 创建新的 GistClient 实例。
-    /// build 失败属于不可恢复的运行时错误（TLS backend 初始化失败等),宁可 panic
-    /// 也不要静默回退到无 user-agent 的 Client::default() — GitHub 强制要求 UA。
+    /// Creates a new GistClient instance.
+    /// A build failure is an unrecoverable runtime error (TLS backend init failure, etc.); better to panic
+    /// than silently fall back to a Client::default() without a user-agent - GitHub requires a UA.
     pub fn new() -> Self {
         let client = Client::builder()
             .user_agent("Warp-Terminal")
@@ -68,7 +68,7 @@ impl GistClient {
         Self { client }
     }
 
-    /// 构建认证头，GitHub 用 Bearer，Gitee 用 token 前缀
+    /// Builds the auth header: GitHub uses Bearer, Gitee uses the token prefix
     fn auth_header(platform: SyncPlatform, token: &str) -> String {
         match platform {
             SyncPlatform::GitHub => format!("Bearer {token}"),
@@ -76,7 +76,7 @@ impl GistClient {
         }
     }
 
-    /// 验证 Token 是否有效，返回用户名
+    /// Validates the token and returns the username
     pub async fn validate_token(
         &self,
         platform: SyncPlatform,
@@ -101,8 +101,8 @@ impl GistClient {
         }
 
         let user: serde_json::Value = resp.json().await?;
-        // 真实成功响应必须含 login 字段;若不含说明响应不是预期的 GitHub/Gitee
-        // /user(可能是 SSO 拦截页 / 代理伪造 200),不能误判为验证通过
+        // A real success response must contain a login field; if not, the response is not the expected GitHub/Gitee
+        // /user (it may be an SSO interception page or a proxy faking a 200), and must not be treated as validated
         let login = user["login"].as_str().ok_or_else(|| GistClientError::Api {
             status: 200,
             body: "The response is missing the login field; the token was not actually validated".to_string(),
@@ -110,7 +110,7 @@ impl GistClient {
         Ok(login.to_string())
     }
 
-    /// 查找 description 为 WARP_CONFIG 的 Gist，返回其 ID
+    /// Finds the Gist whose description is WARP_CONFIG and returns its ID
     pub async fn find_gist(
         &self,
         platform: SyncPlatform,
@@ -151,14 +151,14 @@ impl GistClient {
             }
         }
 
-        // 超过 MAX_PAGES 仍未找到,视作不存在 — 上层会触发 create_gist
+        // Still not found after MAX_PAGES: treat as nonexistent - the caller will trigger create_gist
         log::warn!(
-            "find_gist: 已翻 {FIND_GIST_MAX_PAGES} 页仍未找到 {GIST_DESCRIPTION},放弃以避免死循环 / rate limit"
+            "find_gist: gave up after {FIND_GIST_MAX_PAGES} pages without finding {GIST_DESCRIPTION}, to avoid infinite loops / rate limits"
         );
         Ok(None)
     }
 
-    /// 创建新 Gist
+    /// Creates a new Gist
     pub async fn create_gist(
         &self,
         platform: SyncPlatform,
@@ -197,7 +197,7 @@ impl GistClient {
         Ok(detail.id)
     }
 
-    /// 更新已有 Gist
+    /// Updates an existing Gist
     pub async fn update_gist(
         &self,
         platform: SyncPlatform,
@@ -235,7 +235,7 @@ impl GistClient {
         Ok(())
     }
 
-    /// 获取 Gist 文件内容，自动处理截断
+    /// Gets Gist file content, handling truncation automatically
     pub async fn get_gist_content(
         &self,
         platform: SyncPlatform,
@@ -332,21 +332,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_token_returns_no_token_error() {
-        // 测试环境下 rustls 默认 provider 未安装,先安装(忽略重复安装失败)
+        // In the test environment the rustls default provider is not installed; install it first (ignore duplicate-install failures)
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let client = GistClient::new();
-        // validate_token / find_gist / create_gist / update_gist / get_gist_content 应当在 token 为空时立即返回 NoToken,不发起任何 HTTP 请求
+        // validate_token / find_gist / create_gist / update_gist / get_gist_content should return NoToken immediately when the token is empty, without making any HTTP request
         for platform in [SyncPlatform::GitHub, SyncPlatform::Gitee] {
             let r = client.validate_token(platform, "").await;
-            assert!(matches!(r, Err(GistClientError::NoToken)), "validate_token 空 token");
+            assert!(matches!(r, Err(GistClientError::NoToken)), "validate_token with empty token");
             let r = client.find_gist(platform, "").await;
-            assert!(matches!(r, Err(GistClientError::NoToken)), "find_gist 空 token");
+            assert!(matches!(r, Err(GistClientError::NoToken)), "find_gist with empty token");
             let r = client.create_gist(platform, "", "{}").await;
-            assert!(matches!(r, Err(GistClientError::NoToken)), "create_gist 空 token");
+            assert!(matches!(r, Err(GistClientError::NoToken)), "create_gist with empty token");
             let r = client.update_gist(platform, "", "x", "{}").await;
-            assert!(matches!(r, Err(GistClientError::NoToken)), "update_gist 空 token");
+            assert!(matches!(r, Err(GistClientError::NoToken)), "update_gist with empty token");
             let r = client.get_gist_content(platform, "", "x").await;
-            assert!(matches!(r, Err(GistClientError::NoToken)), "get_gist_content 空 token");
+            assert!(matches!(r, Err(GistClientError::NoToken)), "get_gist_content with empty token");
         }
     }
 }

@@ -139,24 +139,24 @@ where
 pub(super) fn relaunch() -> Result<()> {
     let channel = ChannelState::channel();
 
-    // openWarp(Channel::Oss):没有代码签名,无法用 RENAME_SWAP 在原地替换 bundle。
-    // 改成调 `/usr/bin/open <dmg>`,让 Finder 弹出标准挂载窗口,用户拖到
-    // Applications 目录完成安装。这里不调用 `open -n bundle` 重启自己,因为
-    // 当前进程在 apply_update 阶段已请求 terminate,UI 已经知道要等用户手动
-    // 关闭+重开。dmg 同样在当前进程退出后再启动 Finder。
+    // openWarp (Channel::Oss): there is no code signature, so the bundle cannot be swapped in place with RENAME_SWAP.
+    // Instead call `/usr/bin/open <dmg>` so Finder shows the standard mount window and the user drags to the
+    // Applications folder to finish installing. We do not call `open -n bundle` to relaunch ourselves here, because
+    // the current process already requested terminate during apply_update, and the UI knows to wait for the user to
+    // close and reopen manually. The dmg is likewise opened by Finder after the current process exits.
     if matches!(channel, Channel::Oss) {
         return oss_open_installer();
     }
 
     let bundle_path = PathBuf::from(get_bundle_path()?);
 
-    // 启动新版 Warp 前先等待当前进程退出，避免 Dock 中短暂出现多个图标。
-    // 这里用一个中间 shell 进程轮询当前 PID，进程退出后再启动新版应用。
+    // Before launching the new Warp, wait for the current process to exit, so multiple icons do not briefly appear in the Dock.
+    // An intermediate shell process polls the current PID and launches the new app after the process exits.
     //
-    // 每 200ms 检查一次当前进程是否仍在运行；进程退出后启动新版。
+    // Check every 200ms whether the current process is still running; after it exits, launch the new version.
     //
-    // shell 命令需要谨慎拼接：`pid` 来自当前进程且是数字，bundle 路径和
-    // 环境变量值必须 shell 转义，避免路径中的元字符造成注入。
+    // The shell command must be assembled carefully: `pid` comes from the current process and is numeric, while the bundle path and
+    // environment variable values must be shell-escaped so metacharacters in paths cannot cause injection.
     let pid = std::process::id();
     let quoted_bundle = shell_escape::escape(bundle_path.to_string_lossy());
 
@@ -165,8 +165,8 @@ pub(super) fn relaunch() -> Result<()> {
         quoted_bundle,
         warp_cli::finish_update_flag(),
     );
-    // 测试本地通道版本 JSON 时，让新启动的二进制继续引用同一个文件，
-    // 以便验证自动更新后的 changelog 展示。
+    // When testing the local-channel version JSON, let the newly launched binary keep referencing the same file,
+    // so the changelog display after an auto-update can be verified.
     if let Ok(path) = env::var("WARP_CHANNEL_VERSIONS_PATH") {
         let quoted_path = shell_escape::escape(path.into());
         open_args.push_str(&format!(" --env WARP_CHANNEL_VERSIONS_PATH={quoted_path}"));
@@ -183,12 +183,12 @@ pub(super) fn relaunch() -> Result<()> {
     Ok(())
 }
 
-/// OSS macOS 安装入口:扫描 `cache_dir/autoupdate/<id>/` 找到刚下载的 dmg,
-/// 等当前进程退出后用 `/usr/bin/open <dmg>` 触发 Finder 标准挂载。
+/// OSS macOS install entry point: scans `cache_dir/autoupdate/<id>/` for the just-downloaded dmg,
+/// and after the current process exits triggers the standard Finder mount via `/usr/bin/open <dmg>`.
 fn oss_open_installer() -> Result<()> {
-    // 进入这条路径前 AutoupdateState.stage 必然是 UpdateReady / Updating,
-    // downloaded_update.update_id 必然存在;但我们不在 stateless 函数里访问
-    // AutoupdateState,改成扫描磁盘:遍历 cache_dir/autoupdate/ 找最新 dmg。
+    // On entry to this path AutoupdateState.stage is necessarily UpdateReady / Updating,
+    // and downloaded_update.update_id necessarily exists; but we do not access AutoupdateState in a stateless function,
+    // so we scan the disk instead: walk cache_dir/autoupdate/ to find the newest dmg.
     let mut autoupdate_dir = warp_core::paths::cache_dir();
     autoupdate_dir.push("autoupdate");
 
@@ -196,12 +196,12 @@ fn oss_open_installer() -> Result<()> {
         anyhow!("openWarp: could not find the downloaded dmg (directory: {autoupdate_dir:?})")
     })?;
 
-    log::info!("openWarp: 准备打开安装 dmg {dmg:?}");
+    log::info!("openWarp: preparing to open install dmg {dmg:?}");
 
     let pid = std::process::id();
     let quoted_dmg = shell_escape::escape(dmg.to_string_lossy());
-    // 等当前进程退出后再 open dmg。`open` 默认非阻塞,Finder 拿到 dmg 后会
-    // 自动 mount 并显示挂载窗口;用户在 Finder 里拖拽到 Applications 完成升级。
+    // Open the dmg after the current process exits. `open` is non-blocking by default; once Finder gets the dmg it
+    // mounts it automatically and shows the mount window; the user drags it into Applications in Finder to finish the upgrade.
     let script = format!(
         "while ps -p {pid} >/dev/null 2>&1; do sleep 0.2; done; /usr/bin/open {quoted_dmg}"
     );
@@ -210,8 +210,8 @@ fn oss_open_installer() -> Result<()> {
     Ok(())
 }
 
-/// 在 `autoupdate/` 目录下找出最新一次下载的 dmg。OSS 只下载 dmg 不下载其他文件,
-/// 按文件 mtime 取最新即可。返回 None 表示当前没有可用 dmg(异常情况)。
+/// Finds the most recently downloaded dmg under `autoupdate/`. OSS downloads only a dmg and no other files,
+/// so picking the newest by file mtime is enough. Returns None if no dmg is available (abnormal case).
 fn find_latest_dmg(autoupdate_dir: &Path) -> Option<PathBuf> {
     let mut newest: Option<(PathBuf, std::time::SystemTime)> = None;
     let read_dir = fs::read_dir(autoupdate_dir).ok()?;
@@ -415,10 +415,10 @@ pub(super) async fn download_update_and_cleanup(
 ) -> Result<DownloadReady> {
     let channel = ChannelState::channel();
 
-    // openWarp(Channel::Oss):没有 Apple Developer ID 签名,不能走官方
+    // openWarp (Channel::Oss): there is no Apple Developer ID signature, so the official
     // download_and_extract_binary(mount + cp + codesign verify + RENAME_SWAP)。
-    // OSS 路径只把 dmg 流式下载到 cache_dir/autoupdate/<id>/,apply 时由
-    // `relaunch()` 走 `open <dmg>` 让 Finder 弹标准挂载窗口,用户拖到 Applications。
+    // OSS path only streams the dmg to cache_dir/autoupdate/<id>/; on apply,
+    // `relaunch()` runs `open <dmg>` so Finder shows the standard mount window and the user drags it to Applications.
     let result = if matches!(channel, Channel::Oss) {
         oss_download_dmg(channel, version_info, update_id, client, on_progress).await
     } else {
@@ -430,9 +430,9 @@ pub(super) async fn download_update_and_cleanup(
     result
 }
 
-/// OSS 专用下载:只把 dmg 流式落盘到 `cache_dir/autoupdate/<update_id>/<dmg>`,
-/// 不做挂载也不做代码签名校验。返回 `DownloadReady::Yes` 表示安装包已就绪,
-/// 上层会切到 `UpdateReady`,等待用户点击"立即安装"触发 `relaunch()`。
+/// OSS-only download: streams just the dmg to disk at `cache_dir/autoupdate/<update_id>/<dmg>`,
+/// with no mounting and no code-signature verification. Returns `DownloadReady::Yes` when the installer is ready;
+/// the upper layer then switches to `UpdateReady` and waits for the user to click "Install now" to trigger `relaunch()`.
 async fn oss_download_dmg(
     channel: Channel,
     version_info: &VersionInfo,
@@ -441,7 +441,7 @@ async fn oss_download_dmg(
     on_progress: ProgressCallback,
 ) -> Result<DownloadReady> {
     log::info!(
-        "openWarp: 下载更新 dmg, version {} on channel {channel}",
+        "openWarp: downloading update dmg, version {} on channel {channel}",
         &version_info.version
     );
 
@@ -450,12 +450,12 @@ async fn oss_download_dmg(
 
     let dmg_path_buf = download_dmg(&channel, version_info, update_id, client, on_progress).await?;
 
-    // 故意不做 hdiutil mount / verify_code_signature:OSS 没有 Apple
-    // codesign 也不需要把 .app 拷进当前 bundle。dmg 本身就是用户要"打开"的物件。
-    // 但校验 GitHub Release 元数据里的 SHA-256,防御 CDN 中间人/资产损坏。
+    // Deliberately no hdiutil mount / verify_code_signature: OSS has no Apple
+    // codesign and does not need to copy the .app into the current bundle. The dmg itself is what the user is meant to "open".
+    // But the SHA-256 in the GitHub Release metadata is verified, to defend against CDN man-in-the-middle / corrupted assets.
     let asset_name = dmg_name(channel);
     if let Err(e) = super::verify_oss_asset_sha256(&dmg_path_buf, &asset_name) {
-        // 校验失败时立即删除已下载文件,避免用户点击"安装"后打开损坏的 dmg。
+        // On verification failure, delete the downloaded file immediately so the user does not open a corrupted dmg after clicking "Install".
         let _ = async_fs::remove_file(&dmg_path_buf).await;
         return Err(e);
     }
@@ -764,7 +764,7 @@ async fn download_dmg(
         .send()
         .await?
         .error_for_status()?;
-    // http_client::Response 没有 content_length(),只能从 headers 拿。
+    // http_client::Response has no content_length(); it can only be read from headers.
     let total = res
         .headers()
         .get(http::header::CONTENT_LENGTH)
@@ -772,7 +772,7 @@ async fn download_dmg(
         .and_then(|s| s.parse::<u64>().ok());
     let dmg_file = dmg_path(channel, version_info, update_id);
 
-    // 上报 0/total 让 UI 立刻渲染进度条;后续每写一个 chunk 再 throttle 上报。
+    // Report 0/total so the UI renders the progress bar immediately; afterwards report after each written chunk, throttled.
     on_progress(DownloadProgress {
         downloaded: 0,
         total,
@@ -780,8 +780,8 @@ async fn download_dmg(
 
     let mut file = async_fs::File::create(&dmg_file).await?;
     let mut downloaded: u64 = 0;
-    // 节流:不要每个 chunk 都上报(reqwest chunk 可能很小,UI 会被狂刷重绘)。
-    // 每累积 64 KiB 或时间过 250ms 才推一次;最后一次在循环外强制 flush。
+    // Throttle: do not report on every chunk (reqwest chunks can be tiny and the UI would be redrawn constantly).
+    // Push only after accumulating 64 KiB or after 250ms; the last report is force-flushed outside the loop.
     let mut last_reported = 0u64;
     let mut last_reported_at = Instant::now();
     const REPORT_BYTES_THRESHOLD: u64 = 64 * 1024;
@@ -854,16 +854,16 @@ async fn mount_dmg(dmg_dir: &Path, update_id: &str) -> Result<PathBuf> {
 fn update_url(channel: Channel, version: &str) -> String {
     let asset = dmg_name(channel);
     if matches!(channel, Channel::Oss) {
-        // OSS 走 GitHub Releases:优先用 fetch_latest_release 缓存里的真实
-        // browser_download_url(以防仓库被 redirect / asset 改名)。缓存为空时
-        // 拼一个标准 `releases/download/<tag>/<asset>` 的兜底 URL,tag 直接用
-        // VersionInfo.version 加 `v` 前缀(VersionInfo 已经 trim 过 `v`)。
+        // OSS uses GitHub Releases: prefer the real browser_download_url from the
+        // fetch_latest_release cache (in case the repo is redirected / an asset is renamed). When the cache is empty,
+        // build a standard `releases/download/<tag>/<asset>` fallback URL, with the tag being
+        // VersionInfo.version prefixed with `v` (VersionInfo has already trimmed the `v`).
         if let Some(release) = github::cached_release() {
             if let Some(found) = release.find_asset(&asset) {
                 return found.browser_download_url.clone();
             }
             log::warn!(
-                "openWarp: cached release tag {} 没有名为 {asset} 的资产,回退到 tag URL",
+                "openWarp: cached release tag {} has no asset named {asset}, falling back to tag URL",
                 release.tag_name
             );
         }
@@ -893,9 +893,9 @@ fn dmg_name(channel: Channel) -> String {
         .output()
         .is_ok_and(|output| output.stdout.starts_with(b"arm64"));
 
-    // openWarp GitHub Release 资产名固定使用 `Warp-arm64.dmg` / `Warp-intel.dmg`
-    // (来自 .github/workflows 的命名约定),与 `app_name_prefix("warp")` 不一致。
-    // 这里只对 OSS 写死,不会影响官方 channel 的 universal 命名。
+    // openWarp GitHub Release asset names are fixed as `Warp-arm64.dmg` / `Warp-intel.dmg`
+    // (from the naming convention in .github/workflows), which does not match `app_name_prefix("warp")`.
+    // This is hardcoded for OSS only and does not affect the official channel's universal naming.
     if matches!(channel, Channel::Oss) {
         return if is_arm64 {
             "Warp-arm64.dmg".to_string()

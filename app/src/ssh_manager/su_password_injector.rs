@@ -1,10 +1,10 @@
-//! su 密码确认提示。持续监听 PTY 输出,当检测到用户输入 `su root` / `su - root`
-//! 等切换到 root 的命令后出现密码提示时,弹出确认菜单,用户确认后注入 root 密码
-//! 或共享 OneKey 密码。
+//! su password confirmation prompt. Continuously watches PTY output; when the user types `su root` / `su - root`
+//! or a similar command to switch to root and a password prompt appears, shows a confirmation menu, and after the user confirms injects the root password
+//! or the shared OneKey password.
 //!
-//! 仅为 root 目标注入,`su lg` 等切换到其他用户不触发。
-//! 先等待 shell prompt 出现(表示 SSH 登录已完成)再开始检测,避免与登录密码冲突。
-//! 使用 `spawn_stream_local` + `stream!` 实现持续监听,每次 `su root` 都会触发。
+//! Injects only for the root target; switching to other users (e.g. `su lg`) does not trigger it.
+//! Waits for the shell prompt (meaning the SSH login has finished) before detecting, to avoid conflicting with the login password.
+//! Uses `spawn_stream_local` + `stream!` for continuous watching, so every `su root` triggers.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,32 +22,32 @@ use crate::terminal::TerminalView;
 
 const SLIDING_WINDOW_BYTES: usize = 8 * 1024;
 const BUFFER_HARD_LIMIT: usize = 16 * 1024;
-/// 阶段 1 等待 shell prompt 的最大时长。超时则放弃整个 stream(并在
-/// `on_done` 里把 in_flight 复位)。
+/// Maximum time phase 1 waits for the shell prompt. On timeout the whole stream is abandoned (and
+/// `in_flight` is reset in `on_done`).
 const SHELL_READY_TIMEOUT: Duration = Duration::from_secs(30);
 
 lazy_static! {
-    /// 密码提示符正则 — 严格匹配两类:
-    /// 1. `password` / `passphrase` / `密码` 行尾带半角冒号 `:` 或全角冒号 `：`
-    /// 2. 银河麒麟 V10 的无冒号 `输入密码`
+    /// Password prompt regex — strictly matches two kinds:
+    /// 1. `password` / `passphrase` / `密码` lines ending with an ASCII colon `:` or a full-width colon `：`
+    /// 2. Kylin V10's colonless `输入密码`
     ///
-    /// 旧实现把冒号设为可选,任何含 "password" 的行尾(如
-    /// `Your password has expired`)都会假阳性。
+    /// The old implementation made the colon optional, so any line ending with "password" (such as
+    /// `Your password has expired`) produced false positives.
     static ref PASSWORD_PROMPT_REGEX: Regex = Regex::new(
         r"(?im)(?:(?:password|passphrase|密码)[^\n]*(?::|：)\s*$|输入密码\s*$)"
     )
     .expect("su password prompt regex must compile");
 
-    /// su 命令正则 — 匹配目标为 root 的 su 命令(行尾):
+    /// su command regex — matches su commands targeting root (at end of line):
     /// `su` / `su -` / `su -l` / `su --login` / `su root` / `su - root` /
-    /// `su -l root` / `su --login root`。不匹配 `su lg` / `su - lg` 等切到
-    /// 其他用户的形式;`sudo su` 因 `\bsu` 单词边界仍能命中尾部的 `su`。
+    /// `su -l root` / `su --login root`. Does not match forms that switch to other users, such as `su lg` / `su - lg`;
+    /// `sudo su` still hits the trailing `su` thanks to the `su` word boundary.
     static ref SU_ROOT_CMD_REGEX: Regex =
         Regex::new(r"(?m)\bsu(?:\s+(?:-l?|--login|-))*(?:\s+root)?\s*$")
             .expect("su root cmd regex must compile");
 }
 
-/// 在 owner 上下文 spawn su 密码持续监听 stream。
+/// Spawns the continuous su password watch stream in the owner context.
 pub fn spawn_su_password_injector<O>(
     pty_reads_rx: Option<InactiveReceiver<Arc<Vec<u8>>>>,
     terminal_view: WeakViewHandle<TerminalView>,
@@ -64,7 +64,7 @@ pub fn spawn_su_password_injector<O>(
         log::debug!("ssh su password injector: empty root password - skip");
         return;
     };
-    // 设置 in-flight 标志,阻止 OneKey 凭据选择框在等待 shell prompt 期间弹出。
+    // Set the in-flight flag to stop the OneKey credential picker from popping up while waiting for the shell prompt.
     if let Some(view) = terminal_view.upgrade(ctx) {
         view.update(ctx, |view, _| {
             view.set_ssh_secret_auto_injection_in_flight(true);
@@ -75,7 +75,7 @@ pub fn spawn_su_password_injector<O>(
         let mut active = rx.activate_cloned();
         let mut buf: Vec<u8> = Vec::with_capacity(SLIDING_WINDOW_BYTES);
 
-        // 阶段 1: 等待 shell prompt(SHELL_READY_TIMEOUT 超时),表示登录完成
+        // Phase 1: wait for the shell prompt (times out after SHELL_READY_TIMEOUT), which means login is complete
         loop {
             match active.recv().with_timeout(SHELL_READY_TIMEOUT).await {
                 Ok(Ok(chunk)) => {
@@ -92,7 +92,7 @@ pub fn spawn_su_password_injector<O>(
             }
         }
 
-        // 阶段 2: 持续检测 su root + 密码提示,每次 yield 后继续监听
+        // Phase 2: continuously detect su root + password prompt, keep watching after each yield
         buf.clear();
         while let Ok(chunk) = active.recv().await {
             buf.extend_from_slice(&chunk);
@@ -107,9 +107,9 @@ pub fn spawn_su_password_injector<O>(
         }
     };
 
-    // on_done 必须把 in_flight 复位:阶段 1(等 shell prompt)若超时/EOF 直接
-    // `return` 退出 stream,此时尚未走过 on_item,若不在 on_done 里复位,
-    // OneKey 在该终端会被永久挡住。
+    // on_done must reset in_flight: if phase 1 (waiting for the shell prompt) times out or hits EOF and
+    // `return`s out of the stream directly, on_item has not run yet; without a reset in on_done,
+    // OneKey would be blocked permanently on this terminal.
     let terminal_view_done = terminal_view.clone();
     let _ = ctx.spawn_stream_local(
         prompt_stream,
@@ -133,7 +133,7 @@ pub fn spawn_su_password_injector<O>(
     );
 }
 
-/// 检查缓冲区中是否包含目标为 root 的 su 命令。
+/// Checks whether the buffer contains an su command targeting root.
 fn is_su_to_root(buf: &[u8]) -> bool {
     SU_ROOT_CMD_REGEX.is_match(buf)
 }

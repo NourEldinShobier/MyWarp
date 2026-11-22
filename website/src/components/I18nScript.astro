@@ -1,9 +1,9 @@
 ---
-// 内联语言脚本会在首屏渲染前设置 data-locale,避免文案闪烁。
-// 判定顺序:
-//   1. localStorage('zap:locale')  — 用户显式选择后才写入
-//   2. navigator.languages / navigator.language — 跟随系统/浏览器语言
-//   3. 回退到 'en'
+// The inline locale script sets data-locale before first paint, to avoid text flicker.
+// Decision order:
+//   1. localStorage('zap:locale')  — written only after an explicit user choice
+//   2. navigator.languages / navigator.language — follow the system/browser language
+//   3. fall back to 'en'
 ---
 <script is:inline>
   (function () {

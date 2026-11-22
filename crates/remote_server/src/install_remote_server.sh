@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# 在远端主机安装 Warp CLI 二进制,用于 remote-server-proxy。
+# Install the Warp CLI binary on the remote host, for use by remote-server-proxy.
 #
-# setup.rs 会在运行时替换这些占位符:
-#   {download_base_url}     - 例如 https://github.com/zerx-lab/warp/releases/latest/download
-#   {install_dir}           - 例如 ~/.warp/remote-server
-#   {binary_name}           - 例如 warp
-#   {version_suffix}        - 例如 -v0.2026...,没有 release tag 时为空
-#   {staging_tarball_path}  - SCP fallback 预上传 tarball 路径,常规下载路径为空
+# setup.rs replaces these placeholders at runtime:
+#   {download_base_url}     - e.g. https://github.com/zerx-lab/warp/releases/latest/download
+#   {install_dir}           - e.g. ~/.warp/remote-server
+#   {binary_name}           - e.g. warp
+#   {version_suffix}        - e.g. -v0.2026...; empty when there is no release tag
+#   {staging_tarball_path}  - tarball path pre-uploaded by the SCP fallback; empty on the normal download path
 set -e
 
 arch=$(uname -m)
@@ -30,9 +30,9 @@ esac
 mkdir -p "$install_dir"
 
 tmpdir=$(mktemp -d "$install_dir/.install.XXXXXX")
-# 尽力清理 staging 目录。这里失败不能覆盖真正的安装结果:
-# trap 触发时二进制要么已经移动到最终路径,要么脚本已经因为
-# 其他原因失败,后者的错误更值得暴露给调用方。
+# Best-effort cleanup of the staging directory. A failure here must not override the real install result:
+# when the trap fires, either the binary has already been moved to its final path, or the script has already failed for
+# some other reason, and that error is more worth surfacing to the caller.
 cleanup() {
   rm -rf "$tmpdir" 2>/dev/null || true
 }

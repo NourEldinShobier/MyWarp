@@ -250,7 +250,7 @@ impl ChannelState {
     }
 }
 
-/// Warp Wave 5-5：`derive_http_origin_from_ws_url` 随 `rtc_http_url()` 一同物理删。
+/// Warp Wave 5-5: `derive_http_origin_from_ws_url` was physically removed along with `rtc_http_url()`.
 
 #[cfg(all(test, not(feature = "test-util")))]
 #[path = "state_tests.rs"]

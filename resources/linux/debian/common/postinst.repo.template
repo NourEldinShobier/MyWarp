@@ -1,2 +1,2 @@
-# Warp 不配置上游 Warp APT 软件源,也不安装上游签名 key。
+# Warp does not configure the upstream Warp APT repository or install the upstream signing key.
 :

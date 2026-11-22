@@ -1,7 +1,7 @@
 /* ============================================================
- * Zap docs — Composio 风格重构(与 landing.css 同一套 token / 视觉语言)
- * 三栏布局(sidebar / article / toc)。全直角、细 1px 边框、
- * Inter 正文 + JetBrains Mono 导航/标签/代码。
+ * Zap docs — Composio-style rework (same tokens / visual language as landing.css)
+ * Three-column layout (sidebar / article / toc). All square corners, thin 1px borders,
+ * Inter body text + JetBrains Mono for nav/labels/code.
  * ============================================================ */
 
 :root,
@@ -384,7 +384,7 @@ header.nav {
     }
 }
 
-/* ---------- Docs shell(三栏) ---------- */
+/* ---------- Docs shell (three columns) ---------- */
 .docs-shell {
     display: grid;
     grid-template-columns: 248px minmax(0, 1fr) 220px;
@@ -751,7 +751,7 @@ main.doc code {
     color: var(--ink);
 }
 
-/* ---------- Docs 首页:特性卡片网格 ---------- */
+/* ---------- Docs home: feature card grid ---------- */
 .feat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -789,7 +789,7 @@ main.doc code {
     margin: 0;
 }
 
-/* ---------- 代码卡(CodeCard) ---------- */
+/* ---------- Code card (CodeCard) ---------- */
 .code-card {
     margin: 18px 0;
     background: var(--bg-2);
@@ -964,7 +964,7 @@ pre.code .acc {
     border-color: #6fce8a;
 }
 
-/* ---------- 表格 ---------- */
+/* ---------- Tables ---------- */
 table.props {
     width: 100%;
     border-collapse: collapse;
@@ -1016,7 +1016,7 @@ table.props td.d {
     color: var(--muted);
 }
 
-/* ---------- 上一篇/下一篇 ---------- */
+/* ---------- Previous / next ---------- */
 .pager {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1103,7 +1103,7 @@ aside.toc {
     font-weight: 500;
 }
 
-/* ---------- i18n 可见性 ---------- */
+/* ---------- i18n visibility ---------- */
 body[data-locale="en"] [data-lang]:not([data-lang="en"]),
 body[data-locale="zh"] [data-lang]:not([data-lang="zh"]),
 body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
@@ -1133,7 +1133,7 @@ body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
     background: transparent;
 }
 
-/* ---------- 搜索弹窗 ---------- */
+/* ---------- Search dialog ---------- */
 .search-modal {
     position: fixed;
     inset: 0;
@@ -1187,7 +1187,7 @@ body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
     color: var(--ink);
 }
 
-/* ---------- Pagefind UI 主题适配 ---------- */
+/* ---------- Pagefind UI theme adaptation ---------- */
 :root {
     --pagefind-ui-scale: 0.9;
     --pagefind-ui-primary: var(--accent);
@@ -1203,7 +1203,7 @@ body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
 }
 
 /* ============================================================
- * 主题切换按钮(docs)
+ * Theme toggle button (docs)
  * ============================================================ */
 .theme-toggle {
     position: relative;

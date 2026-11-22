@@ -21,10 +21,10 @@ const { activeSlug } = Astro.props;
 const groups: Group[] = [
   {
     label_en: 'Get Started',
-    label_zh: '快速开始',
-    label_ja: 'はじめに',
+    label_zh: 'Get Started',
+    label_ja: 'Get Started',
     items: [
-      { slug: 'quickstart', label_en: 'Quick Start', label_zh: '快速开始', label_ja: 'クイックスタート' },
+      { slug: 'quickstart', label_en: 'Quick Start', label_zh: 'Quick Start', label_ja: 'Quick Start' },
     ],
   },
 ];
@@ -39,8 +39,8 @@ const groupIcons: Record<string, string> = {
   </div>
   <button class="sb-search" id="docs-search-trigger" type="button">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M14 14l-3.5-3.5"/></svg>
-    <span data-lang="en">Search docs</span><span data-lang="zh">搜索文档</span>
-    <span data-lang="ja">ドキュメントを検索</span>
+    <span data-lang="en">Search docs</span><span data-lang="zh">Search docs</span>
+    <span data-lang="ja">Search docs</span>
     <span class="kbd">⌘K</span>
   </button>
 

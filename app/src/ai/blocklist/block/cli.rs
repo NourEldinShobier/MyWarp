@@ -119,14 +119,14 @@ use super::{
 };
 const MENU_WIDTH: f32 = 200.0;
 const MAX_HEIGHT: f32 = 320.0;
-// CLI agent 浮窗的最小宽度，避免内容被拖到不可读；外层布局也复用该值保持约束一致。
+// Minimum width of the CLI agent floating window, so content can't be dragged into unreadability; the outer layout reuses this value to keep constraints consistent.
 pub(crate) const CLI_SUBAGENT_MIN_RESIZABLE_WIDTH: f32 = 360.0;
 const MIN_RESIZABLE_WIDTH: f32 = CLI_SUBAGENT_MIN_RESIZABLE_WIDTH;
-// CLI agent 浮窗的最小高度，保留一行以上内容和拖拽命中区域。
+// Minimum height of the CLI agent floating window, keeping at least one line of content and the drag hit area.
 const MIN_RESIZABLE_HEIGHT: f32 = 40.0;
-// 横向缩放时给窗口边缘保留的少量可见宽度。
+// A small visible width kept at the window edge when resizing horizontally.
 const MIN_REMAINING_WINDOW_WIDTH: f32 = 16.0;
-// 纵向缩放时给窗口边缘保留的少量可见高度。
+// A small visible height kept at the window edge when resizing vertically.
 const MIN_REMAINING_WINDOW_HEIGHT: f32 = 16.0;
 const AVATAR_RIGHT_MARGIN: f32 = 8.;
 const CONTENT_PADDING: f32 = 12.;
@@ -135,18 +135,18 @@ const USER_QUERY_POSITION_ID: &str = "cli-subagent-user-query-position-id";
 const CONVERSATION_SCROLL_BOTTOM_POSITION_ID: &str = "cli-subagent-conversation-bottom-position-id";
 
 fn cli_subagent_width_bounds(window_width: f32) -> (f32, f32) {
-    // 最大宽度接近整窗，允许右下角浮窗向左覆盖大部分终端区域。
+    // Max width is close to the full window, letting the bottom-right floating window cover most of the terminal area to its left.
     let max = (window_width - MIN_REMAINING_WINDOW_WIDTH).max(MIN_RESIZABLE_WIDTH);
     (MIN_RESIZABLE_WIDTH, max)
 }
 
 fn cli_subagent_height_bounds(window_height: f32) -> (f32, f32) {
-    // 最大高度接近整窗，允许右下角浮窗向上覆盖大部分终端区域。
+    // Max height is close to the full window, letting the bottom-right floating window cover most of the terminal area above it.
     let max = (window_height - MIN_REMAINING_WINDOW_HEIGHT).max(MIN_RESIZABLE_HEIGHT);
     (MIN_RESIZABLE_HEIGHT, max)
 }
 
-/// 追加 CLI agent 浮窗历史 exchange id，并忽略重复事件。
+/// Appends a CLI agent floating window history exchange id, ignoring duplicate events.
 fn cli_subagent_append_history_exchange_id(
     exchange_ids: &mut Vec<AIAgentExchangeId>,
     exchange_id: AIAgentExchangeId,
@@ -159,12 +159,12 @@ fn cli_subagent_append_history_exchange_id(
     true
 }
 
-/// 用户滚轮查看历史后，不再强制把整体对话滚回底部。
+/// After the user scrolls the history with the mouse wheel, stop forcing the whole conversation back to the bottom.
 fn cli_subagent_mark_conversation_scroll_manually_moved(is_pinned: &mut bool) {
     *is_pinned = false;
 }
 
-/// 根据滚轮方向更新贴底状态：已在底部继续向下滚动时保持 auto-scroll。
+/// Updates the stick-to-bottom state from the wheel direction: keeps auto-scroll when already at the bottom and scrolling further down.
 fn cli_subagent_update_conversation_scroll_pin_after_wheel(
     is_pinned: &mut bool,
     vertical_delta: f32,
@@ -181,12 +181,12 @@ fn cli_subagent_update_conversation_scroll_pin_after_wheel(
     false
 }
 
-/// 新一轮 exchange 追加时，默认恢复跟随最新内容。
+/// When a new exchange is appended, following the latest content is restored by default.
 fn cli_subagent_mark_conversation_scroll_should_follow_latest(is_pinned: &mut bool) {
     *is_pinned = true;
 }
 
-/// 切换响应可见性时保存或恢复对话滚动位置。
+/// Saves or restores the conversation scroll position when toggling response visibility.
 fn cli_subagent_response_visibility_scroll_offset(
     current_scroll_offset: f32,
     should_hide_responses: bool,
@@ -200,12 +200,12 @@ fn cli_subagent_response_visibility_scroll_offset(
     }
 }
 
-/// 浮窗内滚轮事件只消费在整体对话窗口中，避免继续带动外层终端滚动。
+/// Wheel events inside the floating window are consumed by the whole conversation window, so they don't also scroll the outer terminal.
 fn cli_subagent_conversation_scroll_wheel_dispatch_result() -> DispatchEventResult {
     DispatchEventResult::StopPropagation
 }
 
-/// 判断 CLI 浮窗中的用户输入气泡是否应该渲染。
+/// Decides whether the user input bubble in the CLI floating window should be rendered.
 fn cli_subagent_should_render_user_input(
     should_hide_responses: bool,
     is_input_dismissed: bool,
@@ -213,7 +213,7 @@ fn cli_subagent_should_render_user_input(
     !should_hide_responses && !is_input_dismissed
 }
 
-/// 判断 CLI subagent 视图在不同模式下是否应该渲染。
+/// Decides whether the CLI subagent view should be rendered in different modes.
 fn cli_subagent_should_render_for_metadata(
     mode: CLISubagentViewMode,
     metadata: Option<&AgentInteractionMetadata>,
@@ -231,7 +231,7 @@ fn cli_subagent_should_render_for_metadata(
     }
 }
 
-/// 统计 CLI 浮窗实际渲染的 output sections，供脱敏索引与 render 累计保持一致。
+/// Counts the output sections actually rendered in the CLI floating window, keeping the redaction index consistent with the render accumulation.
 fn cli_subagent_rendered_output_text_section_count(output: &AIAgentOutput) -> usize {
     output
         .messages
@@ -250,7 +250,7 @@ fn cli_subagent_rendered_output_text_section_count(output: &AIAgentOutput) -> us
         .sum()
 }
 
-/// 按 CLI 浮窗 render 顺序扫描可见 output，并返回参与索引累计的 section 数。
+/// Scans visible output in CLI floating window render order and returns the number of sections counted in the index accumulation.
 fn cli_subagent_run_redaction_on_rendered_output(
     secret_redaction_state: &mut SecretRedactionState,
     output: &AIAgentOutput,
@@ -354,7 +354,7 @@ enum SelectionHandleGroup {
     Action,
 }
 
-/// 按渲染项索引获取独立的选择状态，避免多个气泡共用同一套划词范围。
+/// Gets an independent selection state per render item index, so multiple bubbles don't share one text-selection range.
 fn selection_handle_for_index(handles: &SelectionHandleList, index: usize) -> SelectionHandle {
     let mut handles = handles.borrow_mut();
     while handles.len() <= index {
@@ -363,14 +363,14 @@ fn selection_handle_for_index(handles: &SelectionHandleList, index: usize) -> Se
     handles[index].clone()
 }
 
-/// 清理同一浮窗内一组可选区域的所有划词状态。
+/// Clears all text-selection states of a group of selectable areas in the same floating window.
 fn clear_selection_handles(handles: &SelectionHandleList) {
     for handle in handles.borrow().iter() {
         handle.clear();
     }
 }
 
-/// 清理同组其它可选区域，保留当前正在产生选择的区域。
+/// Clears the other selectable areas in the same group, keeping the area currently producing a selection.
 fn clear_selection_handles_except(handles: &SelectionHandleList, selected_index: usize) {
     for (index, handle) in handles.borrow().iter().enumerate() {
         if index != selected_index {
@@ -379,7 +379,7 @@ fn clear_selection_handles_except(handles: &SelectionHandleList, selected_index:
     }
 }
 
-/// 开始在一个可选区域内划词时，清掉其它同级区域的旧选择状态。
+/// When selection starts in one selectable area, clears stale selection state in the other sibling areas.
 fn clear_selection_handles_for_active_area(
     query_selection_handles: &SelectionHandleList,
     output_selection_handles: &SelectionHandleList,
@@ -424,9 +424,9 @@ struct StateHandles {
 pub struct CLISubagentView {
     block_id: BlockId,
     model: Rc<dyn AIBlockModel<View = CLISubagentView>>,
-    // CLI agent follow-up 会为同一个 subtask 追加多个 exchange；这里保留历史用于渲染旧轮次。
+    // A CLI agent follow-up appends multiple exchanges to the same subtask; history is kept here to render earlier rounds.
     history_models: Vec<Rc<dyn AIBlockModel<View = CLISubagentView>>>,
-    // 与 history_models 对齐，用于防止重复 AppendedExchange 事件把同一轮渲染两次。
+    // Aligned with history_models, used to prevent duplicate AppendedExchange events from rendering the same round twice.
     history_exchange_ids: Vec<AIAgentExchangeId>,
     subagent_controller: ModelHandle<CLISubagentController>,
     action_model: ModelHandle<BlocklistAIActionModel>,
@@ -453,16 +453,16 @@ pub struct CLISubagentView {
     is_allow_menu_open: bool,
     always_allow_write_to_pty_checked: bool,
     always_allow_read_files_checked: bool,
-    // 整体对话滚动是否仍跟随最新输出；用户手动滚轮查看历史后会关闭。
+    // Whether the whole-conversation scroll still follows the latest output; turned off after the user scrolls the history manually.
     is_conversation_scroll_pinned_to_bottom: bool,
-    // Hide responses 会让滚动内容变短并被 scrollable 裁剪到顶部；这里记录隐藏前的位置用于显示时恢复。
+    // Hide responses shortens the scroll content and the scrollable clips it to the top; this records the pre-hide position to restore on show.
     hidden_response_scroll_offset: Option<f32>,
 
     is_input_dismissed: bool,
     input_dismiss_timer_handle: Option<SpawnedFutureHandle>,
-    // 用户拖拽后的浮窗宽度，交给 Resizable 在多次 render 间保持。
+    // Floating window width after a user drag, kept by Resizable across renders.
     resizable_width: ResizableStateHandle,
-    // 用户拖拽后的浮窗高度，同时作为内部滚动区域的 max height。
+    // Floating window height after a user drag, also used as the max height of the inner scroll area.
     resizable_height: ResizableStateHandle,
 
     current_working_directory: Option<String>,
@@ -741,21 +741,21 @@ impl CLISubagentView {
                         })
                     })
                     .or_else(|| {
-                        // Warp BYOP fallback:agent 自起 LRC 时
-                        // `cli_controller::FinishedAction` 通过
-                        // `create_silent_cli_subagent_task_for_conversation` 真实创建
-                        // subtask 但暂未给它 append exchange(没新 query 触发
-                        // `update_for_new_request_input`),用 root task 的 last
-                        // exchange 占位。后续用户 follow-up query 路由到此 task →
-                        // `AppendedExchange` → 上面的订阅(line 365-394)会自动
-                        // 切到真实 exchange。占位不加入 history,避免显示不属于此
-                        // subtask 的 root exchange。
+                        // Warp BYOP fallback: when the agent starts an LRC itself,
+                        // `cli_controller::FinishedAction` really creates the subtask via
+                        // `create_silent_cli_subagent_task_for_conversation` but has not yet
+                        // appended an exchange to it (no new query triggered
+                        // `update_for_new_request_input`), so the root task's last
+                        // exchange is used as a placeholder. A later user follow-up query routed to this task →
+                        // `AppendedExchange` → the subscription above (line 365-394) automatically
+                        // switches to the real exchange. The placeholder is not added to history, to avoid showing a root exchange that doesn't belong to this
+                        // subtask.
                         let fallback = c.root_task_exchanges().last().map(|e| (e.id, Vec::new()));
                         if fallback.is_some() {
                             log::warn!(
-                                "[byop] CLISubagentView::new task={task_id:?} 暂无 \
-                                 exchange,fallback 到 root_task last_exchange;\
-                                 等待 AppendedExchange 触发切换。"
+                                "[byop] CLISubagentView::new task={task_id:?} has no \
+                                 exchange yet, falling back to root_task last_exchange; \
+                                 waiting for AppendedExchange to trigger the switch."
                             );
                         }
                         fallback
@@ -906,7 +906,7 @@ impl CLISubagentView {
         exchange_id: AIAgentExchangeId,
         model: Rc<dyn AIBlockModel<View = CLISubagentView>>,
     ) -> bool {
-        // 同一个 AppendedExchange 可能被多条订阅路径观察到，历史列表只保留一次。
+        // The same AppendedExchange may be observed through multiple subscription paths; the history list keeps it only once.
         if cli_subagent_append_history_exchange_id(&mut self.history_exchange_ids, exchange_id) {
             self.history_models.push(model);
             true
@@ -918,7 +918,7 @@ impl CLISubagentView {
     fn models_to_render_for_output_redaction(
         &self,
     ) -> Vec<Rc<dyn AIBlockModel<View = CLISubagentView>>> {
-        // history_models 非空时已经按 render 顺序包含最新 exchange；否则只渲染当前 model。
+        // When history_models is non-empty it already contains the latest exchange in render order; otherwise only render the current model.
         if self.history_models.is_empty() {
             vec![self.model.clone()]
         } else {
@@ -1354,7 +1354,7 @@ impl CLISubagentView {
                 .collect::<Vec<_>>()
         };
 
-        // 按历史顺序检测所有用户 query，确保旧轮次重新渲染后链接和脱敏索引仍然连续。
+        // Detect all user queries in history order, so links and the redaction index stay contiguous after earlier rounds are re-rendered.
         for (input_index, query) in user_queries.iter().enumerate() {
             detect_links(
                 &mut self.link_detection_state,
@@ -1532,16 +1532,16 @@ impl View for CLISubagentView {
                         self.state_handles.output_selection_handles.clone();
                     let action_selection_handles =
                         self.state_handles.action_selection_handles.clone();
-                    // 克隆一份本区域句柄进闭包，判断"本区域是否真的在参与选择"。
-                    // Flex 会把同一鼠标事件广播给所有兄弟 SelectableArea，未命中的气泡也会触发本回调，
-                    // 此时不能用未命中的回调去清掉真正命中区域的划词状态。
+                    // Clone a handle to this area into the closure, to decide whether "this area is really participating in the selection".
+                    // Flex broadcasts the same mouse event to all sibling SelectableAreas, so bubbles that were not hit also trigger this callback,
+                    // and a non-hit callback must not clear the selection state of the area that was actually hit.
                     let query_selection_handle_clone = query_selection_handle.clone();
                     let mut selectable_text = SelectableArea::new(
                         query_selection_handle,
                         move |selection_args, ctx, _| {
                             let selection = selection_args.selection;
-                            // 只有本区域确实参与选择时（正在 selecting 或已产生非空选中文本），
-                            // 才清掉其它同级区域的旧选择；未命中广播则保持原状。
+                            // Only clear the stale selection of other sibling areas when this area is really participating in the selection (selecting, or has non-empty selected text);
+                            // a non-hit broadcast leaves things unchanged.
                             let is_this_area_active = query_selection_handle_clone.is_selecting()
                                 || selection.as_ref().is_some_and(|s| !s.is_empty());
                             if is_this_area_active {
@@ -1806,16 +1806,16 @@ impl View for CLISubagentView {
                 let query_selection_handles = self.state_handles.query_selection_handles.clone();
                 let output_selection_handles = self.state_handles.output_selection_handles.clone();
                 let action_selection_handles = self.state_handles.action_selection_handles.clone();
-                // 克隆一份本区域的句柄进闭包，用于判断"本区域是否真的在参与选择"。
-                // Flex 会把同一鼠标事件广播给所有兄弟 SelectableArea，未命中的气泡也会触发本回调，
-                // 此时不能用未命中的回调去清掉真正命中区域的划词状态。
+                // Clone a handle to this area into the closure, to decide whether "this area is really participating in the selection".
+                // Flex broadcasts the same mouse event to all sibling SelectableAreas, so bubbles that were not hit also trigger this callback,
+                // and a non-hit callback must not clear the selection state of the area that was actually hit.
                 let output_selection_handle_clone = output_selection_handle.clone();
                 let mut output = SelectableArea::new(
                     output_selection_handle.clone(),
                     move |selection_args, ctx, _| {
                         let selection = selection_args.selection;
-                        // 只有本区域确实参与选择时（正在 selecting 或已产生非空选中文本），
-                        // 才清掉其它同级区域的旧选择；未命中广播则保持原状。
+                        // Only clear the stale selection of other sibling areas when this area is really participating in the selection (selecting, or has non-empty selected text);
+                        // a non-hit broadcast leaves things unchanged.
                         let is_this_area_active = output_selection_handle_clone.is_selecting()
                             || selection.as_ref().is_some_and(|s| !s.is_empty());
                         if is_this_area_active {
@@ -1956,16 +1956,16 @@ impl View for CLISubagentView {
                         self.state_handles.output_selection_handles.clone();
                     let action_selection_handles =
                         self.state_handles.action_selection_handles.clone();
-                    // 克隆一份本区域句柄进闭包，判断"本区域是否真的在参与选择"。
-                    // Flex 会把同一鼠标事件广播给所有兄弟 SelectableArea，未命中的气泡也会触发本回调，
-                    // 此时不能用未命中的回调去清掉真正命中区域的划词状态。
+                    // Clone a handle to this area into the closure, to decide whether "this area is really participating in the selection".
+                    // Flex broadcasts the same mouse event to all sibling SelectableAreas, so bubbles that were not hit also trigger this callback,
+                    // and a non-hit callback must not clear the selection state of the area that was actually hit.
                     let action_selection_handle_clone = action_selection_handle.clone();
                     let mut selectable_action = SelectableArea::new(
                         action_selection_handle,
                         move |selection_args, ctx, _| {
                             let selection = selection_args.selection;
-                            // 只有本区域确实参与选择时（正在 selecting 或已产生非空选中文本），
-                            // 才清掉其它同级区域的旧选择；未命中广播则保持原状。
+                            // Only clear the stale selection of other sibling areas when this area is really participating in the selection (selecting, or has non-empty selected text);
+                            // a non-hit broadcast leaves things unchanged.
                             let is_this_area_active = action_selection_handle_clone.is_selecting()
                                 || selection.as_ref().is_some_and(|s| !s.is_empty());
                             if is_this_area_active {
@@ -2060,7 +2060,7 @@ impl View for CLISubagentView {
             }))
             .finish();
 
-        // 外层负责纵向缩放，内层负责横向缩放；拖拽边放在左上两侧，贴合右下角浮窗形态。
+        // The outer layer handles vertical resizing and the inner layer horizontal resizing; the drag edges sit on the top and left sides, matching the bottom-right floating window.
         Resizable::new(self.resizable_height.clone(), width_resizable)
             .with_dragbar_side(DragBarSide::Top)
             .on_resize(|ctx, _| ctx.notify())

@@ -7,10 +7,10 @@ Type=Application
 Name=Warp
 GenericName=TerminalEmulator
 
-# `warp` 在 deb/rpm 包里是 /opt/warp/warp 的 symlink,
-# 在 arch 包里是 /usr/bin/warp wrapper script —— 三者都在 PATH 上能直接调用。
-# AppImage 打包时 bundle_appimage 会用 sed 把这一行替换为 `Exec=warp %U`,
-# 直接指向 AppImage 内部的二进制。
+# `warp` is a symlink to /opt/warp/warp in deb/rpm packages,
+# and a /usr/bin/warp wrapper script in the arch package -- all three can be invoked directly from PATH.
+# When packaging the AppImage, bundle_appimage uses sed to replace this line with `Exec=warp %U`,
+# pointing directly at the binary inside the AppImage.
 Exec=warp %U
 StartupWMClass=dev.warp.Warp
 

@@ -27,7 +27,7 @@ const {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <Analytics />
-    {/* FOUC 防护:在页面渲染前先设好 theme 与 locale */}
+    {/* FOUC guard: set theme and locale before the page renders */}
     <script is:inline>
       (function () {
         try {
@@ -64,7 +64,7 @@ const {
     <LandingFooter />
 
     <script>
-      // 语言切换、页内导航、标签页、复制按钮与滚动渐显
+      // Language switching, in-page navigation, tabs, copy buttons, and scroll fade-in
       (function () {
         const htmlLang: Record<string, string> = { en: 'en', zh: 'zh-CN', ja: 'ja' };
         function normalizeLocale(value: string | null) {
@@ -96,7 +96,7 @@ const {
           });
         }
         function setLocale(l: string) {
-          // 仅在用户显式选择语言时持久化;自动检测应在后续访问继续跟随系统/浏览器。
+          // Persist only when the user explicitly picks a language; auto-detection should keep following the system/browser on later visits.
           const locale = normalizeLocale(l) || 'en';
           localStorage.setItem('zap:locale', locale);
           applyLocale(locale);
@@ -131,7 +131,7 @@ const {
           if (event.key === 'Escape') closeLocaleMenus();
         });
 
-        // 顶部导航滚动阴影
+        // Top nav scroll shadow
         const navEl = document.querySelector('header.nav');
         function onScroll() {
           if (navEl) navEl.classList.toggle('scrolled', window.scrollY > 8);
@@ -139,7 +139,7 @@ const {
         document.addEventListener('scroll', onScroll, { passive: true });
         onScroll();
 
-        // 主题切换
+        // Theme toggle
         function applyTheme(theme) {
           document.documentElement.setAttribute('data-theme', theme);
           try { localStorage.setItem('zap:theme', theme); } catch (_) {}
@@ -151,7 +151,7 @@ const {
           });
         });
 
-        // 移动端导航开关
+        // Mobile nav toggle
         const toggle = document.querySelector<HTMLButtonElement>('.nav-toggle');
         const links = document.getElementById('primary-nav');
         if (toggle && links) {
@@ -167,7 +167,7 @@ const {
           );
         }
 
-        // 页内平滑滚动
+        // In-page smooth scrolling
         document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach((a) => {
           a.addEventListener('click', (e) => {
             const id = a.getAttribute('href')?.slice(1);
@@ -178,7 +178,7 @@ const {
           });
         });
 
-        // 安装方式标签页
+        // Install method tabs
         document.querySelectorAll<HTMLElement>('.install-tabs').forEach((tabs) => {
           tabs.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
             b.addEventListener('click', () => {
@@ -192,13 +192,13 @@ const {
           });
         });
 
-        // 复制按钮
+        // Copy button
         document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
           btn.addEventListener('click', () => {
             const pre = btn.closest('.pre-wrap, .code-card')?.querySelector<HTMLElement>('pre.code');
             if (pre && navigator.clipboard) navigator.clipboard.writeText(pre.innerText);
             const prev = btn.textContent;
-            btn.textContent = document.body.dataset.locale === 'zh' ? '已复制' : document.body.dataset.locale === 'ja' ? 'コピー済み' : 'Copied';
+            btn.textContent = 'Copied';
             btn.classList.add('copied');
             setTimeout(() => {
               btn.textContent = prev;
@@ -207,7 +207,7 @@ const {
           });
         });
 
-        // 滚动渐显(支持 [data-stagger] 容器内子项依次错峰出现)
+        // Scroll fade-in (supports [data-stagger] containers whose children appear one after another)
         const io = new IntersectionObserver(
           (entries) => {
             entries.forEach((e) => {
@@ -230,7 +230,7 @@ const {
         );
         document.querySelectorAll('.fade-in').forEach((el) => io.observe(el));
 
-        // 顶部滚动进度条
+        // Top scroll progress bar
         const progress = document.getElementById('scroll-progress');
         if (progress) {
           const updateProgress = () => {

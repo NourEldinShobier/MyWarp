@@ -1,13 +1,13 @@
-//! SFTP 协议层错误类型定义
+//! SFTP protocol-layer error type definitions
 //!
-//! 定义 SftpError 和 SftpChannelError 两种错误枚举，
-//! 覆盖连接、认证、超时、权限等错误场景。
+//! Defines two error enums, SftpError and SftpChannelError,
+//! covering error scenarios such as connection, authentication, timeout and permissions.
 //! author: logic
 //! date: 2026-05-31
 
 use thiserror::Error;
 
-/// SFTP 协议级错误
+/// SFTP protocol-level error
 #[derive(Debug, Error)]
 pub enum SftpError {
     #[error("IO error: {0}")]
@@ -35,7 +35,7 @@ pub enum SftpError {
     General(String),
 }
 
-/// SFTP 通道错误
+/// SFTP channel error
 #[derive(Debug, Error)]
 pub enum SftpChannelError {
     #[error("SFTP error: {0}")]

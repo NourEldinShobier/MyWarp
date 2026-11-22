@@ -4,7 +4,7 @@ Technical implementation details are tracked in `TECH.md`. The core repair-bound
 
 ## Problem Statement
 
-Warp BYOP Agent can construct a follow-up request before a real asynchronous tool result has been persisted. To keep the OpenAI Chat tool-call sequence valid, the current request sanitizer may insert a placeholder tool result: `(tool 执行结果未保留)`.
+Warp BYOP Agent can construct a follow-up request before a real asynchronous tool result has been persisted. To keep the OpenAI Chat tool-call sequence valid, the current request sanitizer may insert a placeholder tool result: `(tool result not retained)`.
 
 This avoids upstream protocol rejection, but it gives the model an artificial observation. From the user's perspective, the agent appears to continue normally while reasoning from incomplete or misleading tool output. This can cause repeated actions, weaker follow-up decisions, or confusion in long-running command workflows.
 
@@ -197,7 +197,7 @@ Placeholder tool results should remain available as a defensive repair mechanism
 - If restore/conversion cannot establish a specific restored-legacy repair source for a missing result, the gap should be treated as corrupted persisted history and block serialization by default.
 - Persisting forked-history repair sources should not require a SQL migration; it should extend the existing serialized conversation metadata shape, similar to the compaction sidecar.
 - Placeholder tool results generated from repair records should be outbound-payload artifacts only. They should not be persisted back into conversation history.
-- Placeholder tool results generated for accepted history repair should use a minimal structured JSON payload instead of the legacy bare text `(tool 执行结果未保留)`.
+- Placeholder tool results generated for accepted history repair should use a minimal structured JSON payload instead of the legacy bare text `(tool result not retained)`.
 - The structured repair payload should include `status: "unavailable"`, a `reason` derived from the accepted repair source, and a short generic note such as `tool result was unavailable in repaired conversation history`.
 - Structured repair payload `status` should always be the fixed string `"unavailable"`.
 - Repair-source-specific information should be represented only in the `reason` field, not by varying `status`.
@@ -356,7 +356,7 @@ Placeholder tool results should remain available as a defensive repair mechanism
 - Add coverage that repair records do not authorize repair when only `tool_call_id` matches but `task_id` or assistant tool-call message ID differs.
 - Add coverage that restored conversations with unexplained missing tool results are treated as corrupted persisted history by default.
 - Add coverage that placeholder tool results generated for repair do not mutate task messages or persisted conversation history.
-- Add coverage that repair placeholder payloads are structured JSON with an accepted repair-source reason and do not use the legacy bare text `(tool 执行结果未保留)`.
+- Add coverage that repair placeholder payloads are structured JSON with an accepted repair-source reason and do not use the legacy bare text `(tool result not retained)`.
 - Add coverage that repair placeholder payload `status` is always `"unavailable"` regardless of repair source.
 - Add coverage that repair placeholder payload reason strings map from internal repair-source enums to stable snake_case values.
 - Add coverage that repair placeholder `note` is fixed machine-facing English text and does not vary by UI locale.
@@ -367,7 +367,7 @@ Placeholder tool results should remain available as a defensive repair mechanism
 - Add coverage that stale repair records are ignored by read-only readiness or serializer validation, and that stale-record cleanup is best-effort controller behavior rather than required for request serialization.
 - Add `AIConversation` restore/persist coverage showing that BYOP repair metadata is loaded from and saved back to the `byop_repair_state_json` sidecar.
 - Extend sanitizer tests to confirm placeholders are inserted only for repair cases, not for ordinary in-flight tool execution.
-- Add a regression test for the observed shape where one request contains `(tool 执行结果未保留)` and the next request contains the real cancellation result.
+- Add a regression test for the observed shape where one request contains `(tool result not retained)` and the next request contains the real cancellation result.
 - Add a regression test where a user prompt cancels a running asynchronous tool and the immediately serialized BYOP request contains the cancellation result with no placeholder.
 - Add coverage that a late executor cancellation event after synchronous cancellation-result persistence is deduplicated by `tool_call_id` and does not create duplicate persisted tool results or duplicate outbound tool responses.
 - Add controller or request-construction coverage for a user prompt submitted while a tool action is in progress.
@@ -398,6 +398,6 @@ Placeholder tool results should remain available as a defensive repair mechanism
 
 The observed request set did not show an upstream request rejection problem. All inspected BYOP requests were accepted and had valid tool-call pairing. The issue is conversation fidelity: a protocol-safe placeholder can still be semantically wrong when produced during normal execution.
 
-The current evidence came from local request records and `warp.log`: one request contained `(tool 执行结果未保留)` for a tool call, while the next request contained a real cancellation result for that same call. That suggests Warp can send a follow-up request before the real asynchronous result is persisted.
+The current evidence came from local request records and `warp.log`: one request contained `(tool result not retained)` for a tool call, while the next request contained a real cancellation result for that same call. That suggests Warp can send a follow-up request before the real asynchronous result is persisted.
 
 Regression fixtures derived from this observation should be synthetic, minimal, and redacted. Do not copy real logs, prompts, tool arguments, or user content into tests.

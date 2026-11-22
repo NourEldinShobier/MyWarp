@@ -26,8 +26,8 @@ pub enum EnvVarCollectionSource {
 /// Manages EnvVarCollection panes
 impl EnvVarCollectionManager {
     pub fn new(_ctx: &mut ModelContext<Self>) -> Self {
-        // Warp:同 WorkflowManager — client_id→server_id 转换事件仅云端创建成功后触发,
-        // Warp 无云 = 永不触发。Phase 2c‑1 移除 UpdateManager 订阅与死处理函数。
+        // Warp: same as WorkflowManager. The client_id->server_id conversion event only fires after a successful cloud create;
+        // Warp has no cloud, so it never fires. Phase 2c-1 removes the UpdateManager subscription and the dead handler.
         EnvVarCollectionManager {
             panes_by_hashed_id: HashMap::new(),
         }

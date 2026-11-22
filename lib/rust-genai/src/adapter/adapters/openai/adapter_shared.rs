@@ -85,12 +85,12 @@ impl OpenAIAdapter {
 		// Upstream genai gates this on `OpenAI` only; we widen to DeepSeek here.
 		// DeepSeek docs: https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
 		//
-		// 不再从模型名末尾推断 reasoning_effort(`ReasoningEffort::from_model_name`):
-		// BYOP 用户自定义模型名里的 `-max`/`-plus` 等后缀是模型规格而非推理档位。
-		// 例如 `qwen3.8-max` 会被 `from_model_name` 误剥成 `qwen3.8` 并附带
-		// `reasoning_effort: xhigh`,导致上游网关返回 503 model_not_found。
-		// 因此 reasoning_effort 只来自显式设置(见 app/src/ai/agent_providers/chat_stream.rs
-		// 的 build_chat_options),模型名原样透传。
+		// Do not infer reasoning_effort from the model name suffix (`ReasoningEffort::from_model_name`):
+		// suffixes like `-max`/`-plus` in BYOP user-defined model names are model specs, not reasoning levels.
+		// For example `qwen3.8-max` would be wrongly stripped by `from_model_name` to `qwen3.8` and given
+		// `reasoning_effort: xhigh`, making the upstream gateway return 503 model_not_found.
+		// So reasoning_effort only comes from explicit settings (see build_chat_options in app/src/ai/agent_providers/chat_stream.rs),
+		// and the model name is passed through unchanged.
 		let (reasoning_effort, model_name): (Option<ReasoningEffort>, &str) =
 			if matches!(adapter_kind, AdapterKind::OpenAI | AdapterKind::DeepSeek) {
 				(options_set.reasoning_effort().cloned(), model_name)
@@ -556,9 +556,9 @@ mod tests {
 		);
 	}
 
-	/// BYOP 自定义模型名里的 `-max` 是模型规格后缀,不是推理档位后缀。
-	/// 修复前 `ReasoningEffort::from_model_name` 会把 `qwen3.8-max` 误剥成
-	/// `qwen3.8`,导致上游网关 503 model_not_found。现在模型名应原样透传。
+	/// The `-max` in a BYOP custom model name is a model spec suffix, not a reasoning level suffix.
+	/// Before the fix, `ReasoningEffort::from_model_name` wrongly stripped `qwen3.8-max` to
+	/// `qwen3.8`, making the upstream gateway return 503 model_not_found. Now the model name should be passed through unchanged.
 	#[test]
 	fn test_model_name_with_max_suffix_is_not_trimmed() {
 		let model = ModelIden::new(AdapterKind::OpenAI, "qwen3.8-max");
@@ -582,15 +582,15 @@ mod tests {
 		assert_eq!(
 			web_req.payload["model"].as_str(),
 			Some("qwen3.8-max"),
-			"模型名应原样保留,不被剥掉 -max 后缀"
+			"model name should be kept as is, without stripping the -max suffix"
 		);
 		assert!(
 			web_req.payload.get("reasoning_effort").is_none(),
-			"未显式设置时不应注入 reasoning_effort"
+			"reasoning_effort should not be injected when not explicitly set"
 		);
 	}
 
-	/// 显式设置 reasoning_effort 时,模型名仍应原样保留,同时正确下发档位。
+	/// When reasoning_effort is set explicitly, the model name should still be kept as is, and the level is sent correctly.
 	#[test]
 	fn test_explicit_reasoning_effort_keeps_model_name() {
 		let model = ModelIden::new(AdapterKind::OpenAI, "qwen3.8-max");

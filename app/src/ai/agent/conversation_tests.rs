@@ -229,7 +229,7 @@ fn cli_subagent_snapshot_json_for_test(
     command: &[u8],
     output: &[u8],
 ) -> String {
-    // 模拟已关闭标签后唯一能留在 SQLite conversation_data 里的终端快照。
+    // Simulates the only terminal snapshot that can remain in SQLite conversation_data after a tab is closed.
     let mut block = SerializedBlock::new_for_test(command.to_vec(), output.to_vec());
     block.id = block_id.clone();
     block.ai_metadata = serde_json::to_string(&Some(Into::<SerializedAIMetadata>::into(

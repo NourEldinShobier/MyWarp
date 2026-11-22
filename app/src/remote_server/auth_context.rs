@@ -5,11 +5,11 @@ use warpui::r#async::BoxFuture;
 
 use crate::auth::AuthState;
 
-/// 构造给 remote-server 模块使用的 auth context。
+/// Builds the auth context used by the remote-server module.
 ///
-/// Warp Wave 3-1:`AuthClient` trait 已物理删。Bearer token 来源改为直接读取
-/// `AuthState::get_access_token_ignoring_validity()`(在 Warp 路径下仅在用户挂了
-/// BYOP API key 时返回 `Some`,其余永远 `None`)。
+/// Warp Wave 3-1: the `AuthClient` trait was physically deleted. The Bearer token source now reads directly
+/// `AuthState::get_access_token_ignoring_validity()` (on the Warp path it returns `Some` only when the user has attached a
+/// BYOP API key, and always `None` otherwise).
 pub fn server_api_auth_context(auth_state: Arc<AuthState>) -> RemoteServerAuthContext {
     let token_auth_state = auth_state.clone();
     let identity_auth_state = auth_state;
@@ -24,7 +24,7 @@ pub fn server_api_auth_context(auth_state: Arc<AuthState>) -> RemoteServerAuthCo
 }
 
 fn remote_server_identity_key(auth_state: &AuthState) -> String {
-    // Warp 不再区分匿名 / 已登录身份,统一用 `user_id()`(本地测试 UID)。
+    // Warp no longer distinguishes anonymous / signed-in identities and uniformly uses `user_id()` (a local test UID).
     auth_state
         .user_id()
         .map(|uid| uid.as_string())

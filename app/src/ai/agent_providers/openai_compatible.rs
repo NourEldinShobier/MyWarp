@@ -1,21 +1,21 @@
-//! OpenAI 兼容客户端的最小子集:目前只用来抓 `/models` 列表。
+//! A minimal subset of an OpenAI-compatible client: currently only used to fetch the `/models` list.
 //!
-//! 等第二阶段做 multi-agent 调用时,这里会扩展为完整的
-//! Chat Completions + 工具调用 stream。
+//! When multi-agent calls are built in phase two, this will be extended into a full
+//! Chat Completions + tool-call stream.
 
 use serde::Deserialize;
 
 use http_client::Client;
 
-/// `/models` 端点返回的单个模型条目。
+/// A single model entry returned by the `/models` endpoint.
 ///
-/// 我们只关心 `id`(给 Agent 用作 model 名)。其他字段(`object`/`created`/`owned_by`)
-/// 不同提供商差异较大,这里全部忽略。
+/// We only care about `id` (used by the Agent as the model name). Other fields (`object`/`created`/`owned_by`)
+/// vary widely between providers and are all ignored here.
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct OpenAiCompatibleModel {
     pub id: String,
-    /// 由 `owned_by` 推断的拥有者,主要用作 UI 展示,可能为空。
+    /// Owner inferred from `owned_by`, mainly used for UI display; may be empty.
     #[serde(default)]
     pub owned_by: Option<String>,
 }
@@ -25,7 +25,7 @@ struct ModelsResponse {
     data: Vec<OpenAiCompatibleModel>,
 }
 
-/// fetch 期间可能出现的错误。
+/// Errors that can occur during fetch.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenAiCompatibleError {
     #[error("Invalid base URL: {0}")]
@@ -47,8 +47,8 @@ pub enum OpenAiCompatibleError {
     Other(String),
 }
 
-/// 把用户输入的 base_url 规范化成绝对 URL 形式,
-/// 容忍尾部 `/`、缺失的 `/v1`、`/openai/v1` 等情况。
+/// Normalizes a user-entered base_url into absolute URL form,
+/// tolerating a trailing `/`, a missing `/v1`, `/openai/v1`, and similar cases.
 pub(crate) fn normalize_base_url(input: &str) -> Result<String, OpenAiCompatibleError> {
     let trimmed = input.trim().trim_end_matches('/');
     if trimmed.is_empty() {
@@ -64,10 +64,10 @@ pub(crate) fn normalize_base_url(input: &str) -> Result<String, OpenAiCompatible
     Ok(trimmed.to_string())
 }
 
-/// 调用 `${base_url}/models`,返回模型 ID 列表(已去重 + 按字母序排序)。
+/// Calls `${base_url}/models` and returns the model ID list (deduplicated and sorted alphabetically).
 ///
-/// 鉴权:若 `api_key` 非空则以 `Authorization: Bearer ...` 形式带上。
-/// 部分本地服务(如 Ollama)允许不带鉴权,因此 key 为空时不发送 header。
+/// Auth: if `api_key` is non-empty it is sent as `Authorization: Bearer ...`.
+/// Some local services (such as Ollama) allow unauthenticated access, so no header is sent when the key is empty.
 pub async fn fetch_openai_compatible_models(
     client: Client,
     base_url: &str,

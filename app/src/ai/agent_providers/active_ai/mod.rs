@@ -1,18 +1,18 @@
-//! 主动式 AI(active AI)子链路的 BYOP 适配。
+//! BYOP adaptation of the active-AI sub-pipelines.
 //!
-//! 涵盖三类:
-//! - `prompt_suggestions`:命令完成后给出"问问 Agent"建议(Simple/Coding)
-//! - `nld_predict`:Agent 输入框打字时实时补全
-//! - `relevant_files`:从给定文件列表中筛选与 query 相关的子集
+//! Covers three kinds:
+//! - `prompt_suggestions`: after a command finishes, suggests "ask the Agent" (Simple/Coding)
+//! - `nld_predict`: real-time completion while typing in the Agent input box
+//! - `relevant_files`: picks the subset of a given file list that is relevant to the query
 //!
-//! 共同模式:
-//! 1. 调用方在 spawn 之前(还有 `&AppContext`)调 `dispatch::*` 系列 helper,
-//!    解出 `OneshotConfig` + 渲染好的 system/user prompt → `RenderedRequest`
-//! 2. spawn 闭包内调 `run_*(req)` 发请求 + 解析,返回各子链路对应的 response 类型
-//! 3. UI 回调里直接消费返回的 response,与原 `ServerApi` 路径完全等价
+//! Common pattern:
+//! 1. Before spawning (while an `&AppContext` is still available), the caller invokes the `dispatch::*` helpers,
+//!    which resolve `OneshotConfig` + the rendered system/user prompt -> `RenderedRequest`
+//! 2. Inside the spawn closure, `run_*(req)` sends the request and parses it, returning the response type of each sub-pipeline
+//! 3. The UI callback consumes the returned response directly, fully equivalent to the original `ServerApi` path
 //!
-//! 没有 BYOP 配置(`active_ai_model` 解码失败)→ `dispatch::*` 返回 `None`,
-//! 调用方静默 no-op(Warp 已剥云,不再 fallback ServerApi)。
+//! No BYOP config (`active_ai_model` fails to decode) -> `dispatch::*` returns `None`,
+//! and the caller silently no-ops (Warp has had the cloud stripped, with no fallback to ServerApi).
 
 use minijinja::{context, Environment};
 use serde::Serialize;
@@ -27,7 +27,7 @@ use crate::ai::predict::generate_am_query_suggestions::GenerateAMQuerySuggestion
 pub mod parsing;
 
 // ---------------------------------------------------------------------------
-// 模板
+// Templates
 // ---------------------------------------------------------------------------
 
 static ENV: OnceLock<Environment<'static>> = OnceLock::new();
@@ -102,10 +102,10 @@ fn render(template: &str, ctx: minijinja::Value) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// 公共上下文片段
+// Common context fragments
 // ---------------------------------------------------------------------------
 
-/// 单条已完成命令块的精简上下文(供 prompt_suggestions / nld_predict 消费)。
+/// Condensed context of a single completed command block (consumed by prompt_suggestions / nld_predict).
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct BlockSnippet {
     pub command: String,
@@ -121,7 +121,7 @@ pub struct LastBlockSnippet {
     pub pwd: String,
 }
 
-/// 已渲染好 prompt + 解析好 OneshotConfig 的请求 — 跨 spawn 边界传递。
+/// A request with the prompt already rendered and OneshotConfig already resolved - passed across the spawn boundary.
 pub struct RenderedRequest {
     pub cfg: OneshotConfig,
     pub system: String,
@@ -135,8 +135,7 @@ pub struct RenderedRequest {
 
 pub mod prompt_suggestions {
     use super::*;
-    use crate::settings::language::{Language, LanguageSettings};
-    use warpui::{AppContext, EntityId, SingletonEntity};
+    use warpui::{AppContext, EntityId};
 
     pub struct Input {
         pub recent_blocks: Vec<BlockSnippet>,
@@ -144,37 +143,15 @@ pub mod prompt_suggestions {
         pub last_exit_code: i32,
     }
 
-    /// Spawn 前调用:解 BYOP 配置 + 渲染 prompt。`None` ⇒ 静默 no-op。
+        /// Called before spawn: resolves the BYOP config + renders the prompt. `None` => silent no-op.
     pub fn dispatch(
         app: &AppContext,
         terminal_view_id: Option<EntityId>,
         input: Input,
     ) -> Option<RenderedRequest> {
         let cfg = resolve_active_ai_oneshot(app, terminal_view_id)?;
-        let language = match *LanguageSettings::as_ref(app).language {
-            Language::English => "English",
-            Language::SimplifiedChinese => "Simplified Chinese",
-            Language::Japanese => "Japanese",
-            Language::Russian => "Russian",
-            // Language::System follows the OS locale; resolve via the active i18n loader
-            // so Chinese/Japanese/Russian system-locale users still get localized suggestions.
-            Language::System => {
-                let locale = crate::i18n::current_languages()
-                    .into_iter()
-                    .next()
-                    .map(|l| l.to_string())
-                    .unwrap_or_default();
-                if locale.starts_with("zh") {
-                    "Simplified Chinese"
-                } else if locale.starts_with("ja") {
-                    "Japanese"
-                } else if locale.starts_with("ru") {
-                    "Russian"
-                } else {
-                    "English"
-                }
-            }
-        };
+        // UI is English-only now, so suggestions are always requested in English.
+        let language = "English";
         let system = render("prompt_suggestions_system.j2", context! { language => language });
         let user = render(
             "prompt_suggestions_user.j2",
@@ -196,7 +173,7 @@ pub mod prompt_suggestions {
         })
     }
 
-    /// Spawn 内执行:发请求 + 解析。失败 → `None`(调用方映射为 Error)。
+        /// Runs inside spawn: sends the request + parses. On failure -> `None` (the caller maps it to Error).
     pub async fn run(req: RenderedRequest) -> Option<GenerateAMQuerySuggestionsResponse> {
         let raw = match byop_oneshot_completion(&req.cfg, &req.system, &req.user, &req.opts).await {
             Ok(s) => s,
@@ -340,7 +317,7 @@ pub mod relevant_files {
 }
 
 // ---------------------------------------------------------------------------
-// workflow_metadata(Workflow Editor 的 Autofill 按钮:命令 → 参数化 metadata)
+// workflow_metadata (Autofill button of the Workflow Editor: command -> parameterized metadata)
 // ---------------------------------------------------------------------------
 
 pub mod workflow_metadata {
@@ -353,7 +330,7 @@ pub mod workflow_metadata {
         pub command: String,
     }
 
-    /// Spawn 前调用:解 BYOP 配置 + 渲染 prompt。`None` ⇒ 调用方提示用户配置 BYOP。
+        /// Called before spawn: resolves the BYOP config + renders the prompt. `None` => the caller prompts the user to configure BYOP.
     pub fn dispatch(
         app: &AppContext,
         terminal_view_id: Option<EntityId>,
@@ -379,7 +356,7 @@ pub mod workflow_metadata {
         })
     }
 
-    /// Spawn 内执行:发请求 + 解析。失败 → `None`(调用方映射为 BadCommand)。
+        /// Runs inside spawn: sends the request + parses. On failure -> `None` (the caller maps it to BadCommand).
     pub async fn run(req: RenderedRequest) -> Option<WorkflowMetadataDto> {
         let raw = match byop_oneshot_completion(&req.cfg, &req.system, &req.user, &req.opts).await {
             Ok(s) => s,
@@ -397,7 +374,7 @@ pub mod workflow_metadata {
 }
 
 // ---------------------------------------------------------------------------
-// next_command(灰色补全 / zero-state 建议)
+// next_command (gray completion / zero-state suggestions)
 // ---------------------------------------------------------------------------
 
 pub mod next_command {
@@ -412,24 +389,24 @@ pub mod next_command {
 
     pub struct Input {
         pub recent_blocks: Vec<BlockSnippet>,
-        /// 已在 client 端从历史 DB 选出的相似命令上下文(可选)。
+                /// Context of similar commands already picked from the history DB on the client side (optional).
         pub history_context: String,
         pub system_context: Option<String>,
-        /// 用户已输入的前缀(必须用作输出前缀)。
+                /// The prefix the user has already typed (must be used as the output prefix).
         pub prefix: Option<String>,
-        /// 之前已 reject 的建议(避免重复)。
+                /// Suggestions that were previously rejected (to avoid repeats).
         pub rejected_suggestions: Vec<String>,
-        /// 用户在 设置 → Agents → Rules 中配置的全局规则快照。
+                /// Snapshot of the global rules the user configured in Settings -> Agents -> Rules.
         pub user_rules: Vec<(Option<String>, String)>,
     }
 
-    /// Pre-spawn:解 BYOP 配置(需要 `&AppContext`)。`None` ⇒ 静默 no-op。
+        /// Pre-spawn: resolves the BYOP config (needs `&AppContext`). `None` => silent no-op.
     pub fn resolve(app: &AppContext, terminal_view_id: Option<EntityId>) -> Option<OneshotConfig> {
         resolve_next_command_oneshot(app, terminal_view_id)
     }
 
-    /// In-spawn:用 cfg + Input 渲染 prompt 并发请求。
-    /// 模板渲染不依赖 AppContext,可在 spawn 内同步调用。
+        /// In-spawn: renders the prompt with cfg + Input and sends the request.
+        /// Template rendering does not depend on AppContext and can be called synchronously inside spawn.
     pub async fn run_with(cfg: OneshotConfig, input: Input) -> Option<String> {
         let user_rule_ctxs: Vec<UserRuleCtx> = input
             .user_rules

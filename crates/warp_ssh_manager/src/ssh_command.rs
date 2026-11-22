@@ -1,23 +1,23 @@
-//! 把 `SshServerInfo` 拼成 `ssh ...` 命令,并派生测试连接的子进程。
+//! Builds a `SshServerInfo` into a `ssh ...` command and spawns the connection-test child process.
 //!
-//! 写入 PTY 时调 `build_ssh_command_line`,会用 shell-escape 引用每个 arg,
-//! 防止用户名 / host / key_path 里的空格或单引号破坏命令行。
+//! `build_ssh_command_line` is called when writing to the PTY and shell-escapes each arg,
+//! so spaces or single quotes in the username / host / key_path cannot break the command line.
 //!
-//! ## 密码认证安全 & 跨平台兼容性
+//! ## Password auth security & cross-platform compatibility
 //!
-//! **非 Windows**:`ssh` 在 pipe stdin 模式下能正常从 stdin 读密码,采用一次性
-//! stdin 注入(`build_password_auth_stdin`)。密码全程只在内存中以
-//! `Zeroizing<String>` 形式持有,不进 argv,不会出现在 `/proc/<pid>/cmdline`、
-//! `ps` 等同机可读的进程信息里(对 sshpass `-p` 模式的修复)。
+//! **Non-Windows**: `ssh` can read the password from stdin in piped-stdin mode, so a one-shot
+//! stdin injection is used (`build_password_auth_stdin`). The password is held only in memory as
+//! `Zeroizing<String>`, never in argv, so it does not appear in `/proc/<pid>/cmdline`,
+//! `ps` or other process info readable on the same machine (a fix for the sshpass `-p` mode).
 //!
-//! **Windows**:Win32-OpenSSH 即便 stdin 是 pipe,也会因为
-//! `CREATE_NO_WINDOW`(无控制台)拒绝从 stdin 读密码,打印
-//! `GetConsoleMode on STD_INPUT_HANDLE failed` 后挂死,见
-//! PowerShell/Win32-OpenSSH issue #1470。绕开方案是 `SSH_ASKPASS`:
-//! 写一个临时 .cmd 脚本,ssh 派生它并把 stdout 当密码读,完全绕过 stdin
-//! 和控制台。`SSH_ASKPASS_REQUIRE=force` 强制走 askpass 路径。密码本身
-//! 通过临时文件传给 askpass 脚本(不写 env var,降低泄漏面),整个生命周期
-//! 由 `AskpassSession` RAII 守卫保证 ssh 退出后立即清理。
+//! **Windows**: even when stdin is a pipe, Win32-OpenSSH refuses to read the password from stdin because of
+//! `CREATE_NO_WINDOW` (no console); it prints
+//! `GetConsoleMode on STD_INPUT_HANDLE failed` and hangs, see
+//! PowerShell/Win32-OpenSSH issue #1470. The workaround is `SSH_ASKPASS`:
+//! write a temporary .cmd script; ssh spawns it and reads its stdout as the password, bypassing stdin
+//! and the console entirely. `SSH_ASKPASS_REQUIRE=force` forces the askpass path. The password itself
+//! is passed to the askpass script through a temp file (not an env var, to reduce the leak surface), and the whole lifetime
+//! is managed by the `AskpassSession` RAII guard, which cleans up as soon as ssh exits.
 
 use crate::types::{AuthType, ConnectionStatus, SshServerInfo};
 #[cfg(not(windows))]
@@ -95,8 +95,8 @@ pub async fn test_connection(
 
 async fn test_key_auth(server: &SshServerInfo) -> Result<(), String> {
     let mut args = build_ssh_args(server);
-    // build_ssh_args 末尾是 destination (user@host),-o 选项必须插在
-    // destination 之前,否则 SSH 把 -o 当作远程命令的一部分而非自身选项。
+    // build_ssh_args ends with the destination (user@host); -o options must be inserted before
+    // the destination, otherwise SSH treats -o as part of the remote command instead of its own option.
     let target = args.pop().unwrap();
     args.extend([
         "-o".into(),
@@ -114,7 +114,7 @@ async fn test_key_auth(server: &SshServerInfo) -> Result<(), String> {
 
     match tokio::time::timeout(TEST_TIMEOUT, run_ssh_test(&cmd_args)).await {
         Ok(Ok(output)) => {
-            // 严格匹配 `echo ok`,不放过 banner/motd 末尾恰好是 "ok" 的误判。
+            // Strictly match `echo ok`, so a banner/motd that happens to end in "ok" is not misjudged as success.
             if output.trim() == "ok" {
                 Ok(())
             } else {
@@ -132,17 +132,17 @@ async fn test_password_auth(
 ) -> Result<(), String> {
     let password = password.ok_or("Password not provided")?;
 
-    // 构造 ssh 命令参数(注意 -o 选项必须插在 destination 之前,见该函数注释)
+    // Build the ssh command arguments (note: -o options must be inserted before the destination, see that function's comment)
     let cmd_args = build_password_auth_cmd_args(server);
 
-    // 平台分支:Windows 走 SSH_ASKPASS,其他平台走 stdin 注入
+    // Platform branch: Windows uses SSH_ASKPASS, other platforms use stdin injection
     #[cfg(windows)]
     return test_password_auth_windows(cmd_args, &password).await;
     #[cfg(not(windows))]
     test_password_auth_unix(cmd_args, &password).await
 }
 
-/// 非 Windows 平台:`ssh` 能从 pipe stdin 正常读密码。
+/// Non-Windows platforms: `ssh` can read the password from piped stdin.
 #[cfg(not(windows))]
 async fn test_password_auth_unix(
     cmd_args: Vec<String>,
@@ -175,7 +175,7 @@ async fn test_password_auth_unix(
     finalize_password_test_result(&output)
 }
 
-/// Windows 平台:用 SSH_ASKPASS 机制把密码递给 ssh,完全绕开 stdin/控制台。
+/// Windows: hands the password to ssh via SSH_ASKPASS, bypassing stdin/console entirely.
 #[cfg(windows)]
 async fn test_password_auth_windows(
     cmd_args: Vec<String>,
@@ -185,7 +185,7 @@ async fn test_password_auth_windows(
 
     let mut cmd = command::r#async::Command::new("ssh");
     cmd.args(&cmd_args)
-        // ssh 不再需要从 stdin 读密码,设为 null 避免 ssh 误以为有 tty
+        // ssh no longer needs to read a password from stdin; set to null so ssh does not think there is a tty
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -194,8 +194,8 @@ async fn test_password_auth_windows(
 
     let child = cmd.spawn().map_err(|e| format!("Failed to start ssh: {e}"))?;
 
-    // timeout 命中时 child 被 drop → kill_on_drop 自动 kill ssh。
-    // askpass 守卫在函数尾部 drop,清理临时文件。
+    // When the timeout hits, the child is dropped -> kill_on_drop kills ssh automatically.
+    // The askpass guard is dropped at the end of the function, cleaning up the temp files.
     let output = match tokio::time::timeout(TEST_TIMEOUT, child.output()).await {
         Ok(Ok(out)) => out,
         Ok(Err(e)) => return Err(format!("Failed to read ssh output: {e}")),
@@ -206,26 +206,26 @@ async fn test_password_auth_windows(
     finalize_password_test_result(&output)
 }
 
-/// 解析 ssh 子进程的输出,统一成功/失败判定逻辑(两平台共享)。
+/// Parses the ssh child process output into a unified success/failure decision (shared by both platforms).
 fn finalize_password_test_result(output: &std::process::Output) -> Result<(), String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr_trimmed = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
-    // 始终把 ssh 真实 stderr 落日志,即便成功也留痕,便于事后排查
-    // "为什么 server 接受了 password 但 UI 报成功"的差异。
+    // Always log ssh's real stderr, even on success, to help diagnose later
+    // cases where "the server accepted the password but the UI reported success" differ.
     if !stderr_trimmed.is_empty() {
         log::warn!("ssh test stderr: {stderr_trimmed}");
     }
 
-    // 成功判定:严格匹配 `echo ok` 的输出。原先 `ends_with("ok")` 的兜底
-    // 会让 banner / motd 末尾碰巧以 "ok" 结尾时误判为成功,这里去掉。
+    // Success check: strictly match the `echo ok` output. The earlier `ends_with("ok")` fallback
+    // misjudged success when a banner / motd happened to end in "ok"; it is removed here.
     if output.status.success() && stdout.trim() == "ok" {
         Ok(())
     } else if stderr_trimmed.contains("Permission denied")
         || stderr_trimmed.contains("Authentication failed")
     {
-        // 错误信息带上精简 stderr(<= 200 字符),便于用户判断 server 端
-        // 是没启 password、还是配置了 kbd-only AuthenticationMethods 等。
+        // The error message includes a trimmed stderr (<= 200 chars) so the user can tell whether the server
+        // has password auth disabled or is configured with kbd-only AuthenticationMethods, etc.
         let detail = if stderr_trimmed.is_empty() {
             String::new()
         } else {
@@ -246,11 +246,11 @@ fn finalize_password_test_result(output: &std::process::Output) -> Result<(), St
     }
 }
 
-/// 把密码编码成要写入 ssh stdin 的字节流:密码 UTF-8 + 换行。
-/// 独立成纯函数,便于单测断言"stdin 包含密码字面量 + 换行"。
-/// 仅 unix 分支实际调用(Windows 走 SSH_ASKPASS),但函数本身跨平台编译,
-/// 让 `build_password_auth_stdin_*` 单测可以在 Windows CI 上也跑。
-// Windows 上仅测试调用此函数,生产路径用 SSH_ASKPASS,加 dead_code 抑制
+/// Encodes the password into the byte stream written to ssh stdin: password UTF-8 + newline.
+/// Kept as a pure function so unit tests can assert "stdin contains the password literal + newline".
+/// Only the unix branch actually calls it (Windows uses SSH_ASKPASS), but the function compiles on all platforms,
+/// so the `build_password_auth_stdin_*` unit tests can also run on Windows CI.
+// On Windows only tests call this function (production uses SSH_ASKPASS); dead_code is suppressed
 #[cfg_attr(windows, allow(dead_code))]
 fn build_password_auth_stdin(password: &Zeroizing<String>) -> Zeroizing<Vec<u8>> {
     let mut v = Zeroizing::new(Vec::with_capacity(password.len() + 1));
@@ -259,35 +259,35 @@ fn build_password_auth_stdin(password: &Zeroizing<String>) -> Zeroizing<Vec<u8>>
     v
 }
 
-/// 拼出 password 认证测试时给 ssh 子进程的完整 argv。
+/// Builds the full argv passed to the ssh child process for the password-auth test.
 ///
-/// 与 `build_ssh_args` 不同:这里跳过首项 `"ssh"`(我们用
-/// `Command::new("ssh")` 显式派生),追加测试用 `-o` 选项和 `echo ok` 远端命令。
+/// Unlike `build_ssh_args`, this skips the leading `"ssh"` item (we spawn with
+/// `Command::new("ssh")` explicitly) and appends the test `-o` options and the `echo ok` remote command.
 ///
-/// 关键选项含义:
-/// - `BatchMode=no`:允许 ssh 从 stdin / askpass 读密码(不走 askpass 时需要 stdin)
-/// - `PreferredAuthentications=password`:**只**声明想试 password,不带
-///   `keyboard-interactive`。否则 server 端 PAM 在 password 之后会触发
-///   kbd-interactive fallback,kbd-int 子 prompt 拿不到响应,会逐项重试
-///   并触发 `pam_faildelay`(~2s/次),累计 ~8-10s 顶满 `TEST_TIMEOUT`。
-/// - `KbdInteractiveAuthentication=no`:客户端能力开关,直接禁掉整个 kbd-int
-///   协议。光靠 `PreferredAuthentications` 不够——它只约束 password 子方法的
-///   prompt 次数,kbd-int 仍可走;两个开关都设才是 defense in depth。
-/// - `NumberOfPasswordPrompts=1`:password 子方法只允许 1 次重试。
-/// - `ConnectTimeout=5`:单次 TCP 连接超时。
-/// - `StrictHostKeyChecking=no`:不拦 known_hosts(测试场景下避免 host key
-///   变化导致误报,真实终端连接走别的路径)。
-/// - `LogLevel=ERROR`:抑制 host key 提示 / banner 等噪音。
+/// Meaning of the key options:
+/// - `BatchMode=no`: lets ssh read the password from stdin / askpass (stdin is needed when askpass is not used)
+/// - `PreferredAuthentications=password`: declares **only** password, without
+///   `keyboard-interactive`. Otherwise the server's PAM triggers a kbd-interactive fallback after password,
+///   the kbd-int sub-prompts get no response and are retried one by one,
+///   triggering `pam_faildelay` (~2s each), adding up to ~8-10s and hitting `TEST_TIMEOUT`.
+/// - `KbdInteractiveAuthentication=no`: client capability switch that disables the whole kbd-int
+///   protocol. `PreferredAuthentications` alone is not enough, since it only limits the number of password sub-method
+///   prompts and kbd-int can still be used; setting both is defense in depth.
+/// - `NumberOfPasswordPrompts=1`: the password sub-method is allowed only 1 retry.
+/// - `ConnectTimeout=5`: timeout for a single TCP connection.
+/// - `StrictHostKeyChecking=no`: do not block on known_hosts (avoids false alarms from host key
+///   changes in the test scenario; real terminal connections use a different path).
+/// - `LogLevel=ERROR`: suppresses noise such as host key prompts / banners.
 ///
-/// `echo ok` 作为远端命令,严格匹配 stdout 判定成功(避免 banner / motd
-/// 末尾恰好含 "ok" 的误判)。
+/// `echo ok` is the remote command, and stdout is strictly matched to decide success (avoids misjudging a banner / motd
+/// that happens to end in "ok").
 ///
 /// author: logic
 /// date: 2026-06-01
 fn build_password_auth_cmd_args(server: &SshServerInfo) -> Vec<String> {
-    // skip(1) 去掉 "ssh" 本身(Command::new 已指定),剩下
-    // ["-p","2222","user@host"]。-o 选项必须插在 destination 之前,
-    // 否则 SSH 把 -o 当作远程命令的一部分而非自身选项。
+    // skip(1) drops "ssh" itself (already given to Command::new), leaving
+    // ["-p","2222","user@host"]. -o options must be inserted before the destination,
+    // otherwise SSH treats -o as part of the remote command instead of its own option.
     let mut args: Vec<String> = build_ssh_args(server).into_iter().skip(1).collect();
     let target = args.pop().unwrap();
     args.extend([
@@ -312,8 +312,8 @@ fn build_password_auth_cmd_args(server: &SshServerInfo) -> Vec<String> {
 }
 
 async fn run_ssh_test(args: &[String]) -> Result<String, std::io::Error> {
-    // 统一走 command::r#async 派生子进程,Windows 上会带 CREATE_NO_WINDOW,
-    // 避免闪出控制台窗口(见 .clippy.toml 对 tokio::process::Command 的禁用)。
+    // Always spawn via command::r#async; on Windows this adds CREATE_NO_WINDOW,
+    // avoiding a flashing console window (see the .clippy.toml ban on tokio::process::Command).
     let output = command::r#async::Command::new(&args[0])
         .args(&args[1..])
         .output()
@@ -322,8 +322,8 @@ async fn run_ssh_test(args: &[String]) -> Result<String, std::io::Error> {
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
-    // 成功判定:进程退出码为 0,或远端 `echo ok` 的输出已回传(部分 sshpass
-    // 警告会让退出码非零,但 stdout 里仍含 "ok")。
+    // Success check: process exit code 0, or the remote `echo ok` output was returned (some sshpass
+    // warnings make the exit code non-zero while stdout still contains "ok").
     if output.status.success() || stdout.contains("ok") {
         Ok(stdout)
     } else {
@@ -331,28 +331,28 @@ async fn run_ssh_test(args: &[String]) -> Result<String, std::io::Error> {
     }
 }
 
-/// Windows 专属 askpass 会话:在临时目录创建密码文件 + askpass 辅助脚本,
-/// 暴露给 `ssh` 通过 `SSH_ASKPASS` 环境变量使用,drop 时自动清理两个文件。
+/// Windows-only askpass session: creates a password file + askpass helper script in the temp dir,
+/// exposes them to `ssh` via the `SSH_ASKPASS` environment variable, and deletes both files on drop.
 ///
-/// `ssh.exe` 在 Windows 上即便 stdin 是 pipe,也会因为无控制台而拒绝从
-/// stdin 读密码(打印 `GetConsoleMode on STD_INPUT_HANDLE failed` 后挂死),
-/// 详见 PowerShell/Win32-OpenSSH issue #1470。绕开方案是 `SSH_ASKPASS`:
-/// `ssh` 看到该环境变量后,会派生指定程序并把它的 stdout 当作密码,完全
-/// 绕过 stdin 和控制台。`SSH_ASKPASS_REQUIRE=force` 强制 ssh 即便检测到
-/// TTY 也走 askpass 路径。
+/// On Windows, even when stdin is a pipe, `ssh.exe` refuses to read the password from
+/// stdin because there is no console (it prints `GetConsoleMode on STD_INPUT_HANDLE failed` and hangs),
+/// see PowerShell/Win32-OpenSSH issue #1470. The workaround is `SSH_ASKPASS`:
+/// when `ssh` sees that environment variable, it spawns the given program and reads its stdout as the password, bypassing
+/// stdin and the console entirely. `SSH_ASKPASS_REQUIRE=force` forces ssh onto the askpass path even if it detects a
+/// TTY.
 ///
-/// 密码通过临时文件传给 askpass 脚本(不写 env var,降低泄漏面):env var
-/// 会在 `ssh` 子进程及其所有子进程里可见。askpass 进程生命周期极短(ssh
-/// fork 后立刻 exec,读完就退出),落盘窗口可控到毫秒级。
+/// The password is passed to the askpass script through a temp file (not an env var, to reduce the leak surface): an env var
+/// would be visible in the `ssh` child process and all its children. The askpass process lives very briefly (ssh
+/// forks, execs immediately, and the process exits after reading), so the on-disk window is limited to milliseconds.
 ///
-/// **安全权衡**:两个临时文件不设 `FILE_ATTRIBUTE_HIDDEN`、不动 ACL,
-/// 走 Windows `%TEMP%` 默认隔离(`C:\Users\<user>\AppData\Local\Temp`,
-/// 每个用户独立)。早先版本试过隐藏属性 + icacls 收紧到 `(R)`,但
-/// `FILE_ATTRIBUTE_HIDDEN` 会让 `posix_spawnp` 在 `CreateProcessW` 阶段
-/// 返回 `ERROR_ACCESS_DENIED`(error 5),askpass 根本起不来,反而把
-/// 密码错误地送到了 server 的 password prompt(用户看到 "wrong password"
-/// 但其实根本没传出去)。Windows temp dir 的 per-user 隔离已经够用,
-/// 这里把简单可靠排在"defense in depth"前面。
+/// **Security trade-off**: the two temp files do not set `FILE_ATTRIBUTE_HIDDEN` and do not touch ACLs,
+/// relying on the default Windows `%TEMP%` isolation (`C:\Users\<user>\AppData\Local\Temp`,
+/// separate for each user). An earlier version tried a hidden attribute + icacls tightening to `(R)`, but
+/// `FILE_ATTRIBUTE_HIDDEN` makes `posix_spawnp` return `ERROR_ACCESS_DENIED` (error 5)
+/// at the `CreateProcessW` stage, so askpass never started and the
+/// password was wrongly sent to the server's password prompt (the user saw "wrong password"
+/// but nothing had actually been sent). Per-user isolation of the Windows temp dir is enough,
+/// so simple and reliable is ranked above "defense in depth" here.
 ///
 /// author: logic
 /// date: 2026-06-01
@@ -378,7 +378,7 @@ impl AskpassSession {
         let password_path = dir.join(format!("warp-ssh-askpass-{suffix}.txt"));
         let script_path = dir.join(format!("warp-ssh-askpass-{suffix}.cmd"));
 
-        // 写密码到临时文件(不设 hidden、不动 ACL,见类型 doc 的安全权衡)
+        // Write the password to a temp file (no hidden attribute, no ACL changes; see the trade-off in the type doc)
         {
             let mut f = std::fs::OpenOptions::new()
                 .write(true)
@@ -388,10 +388,10 @@ impl AskpassSession {
             f.sync_all()?;
         }
 
-        // 写 askpass 辅助脚本:读取 %WARP_SSH_ASKPASS_FILE% 指向的文件首行,
-        // echo 到 stdout。`set /p` 读首行(去掉换行),`echo !PW!` 输出。
-        // 使用 `setlocal enabledelayedexpansion` + `!PW!` 延迟展开,避免密码
-        // 含 cmd 特殊字符(&, |, <, >, ^)时被 %PW% 的即时展开二次解析截断。
+        // Write the askpass helper script: read the first line of the file pointed to by %WARP_SSH_ASKPASS_FILE%
+        // and echo it to stdout. `set /p` reads the first line (newline stripped), `echo !PW!` prints it.
+        // Uses `setlocal enabledelayedexpansion` + `!PW!` delayed expansion, so a password containing
+        // cmd special characters (&, |, <, >, ^) is not re-parsed and truncated by the immediate expansion of %PW%.
         let body = "@echo off\r\nsetlocal enabledelayedexpansion\r\nset /p PW=<\"%WARP_SSH_ASKPASS_FILE%\"\r\necho !PW!\r\nendlocal\r\n";
         {
             let mut f = std::fs::OpenOptions::new()
@@ -408,7 +408,7 @@ impl AskpassSession {
         })
     }
 
-    /// 把 SSH_ASKPASS 所需的环境变量挂到 ssh 子进程上。
+    /// Attaches the environment variables SSH_ASKPASS needs to the ssh child process.
     fn apply_env(&self, cmd: &mut command::r#async::Command) {
         cmd.env("SSH_ASKPASS", &self.script_path)
             .env("SSH_ASKPASS_REQUIRE", "force")
@@ -420,8 +420,8 @@ impl AskpassSession {
 #[cfg(windows)]
 impl Drop for AskpassSession {
     fn drop(&mut self) {
-        // ssh 退出后立即删除两个临时文件,缩短密码在磁盘上的存活窗口。
-        // 错误吞掉:清理失败不应影响主流程返回值。
+        // Delete both temp files right after ssh exits, shortening the time the password lives on disk.
+        // Errors are swallowed: a cleanup failure must not affect the main flow's return value.
         let _ = std::fs::remove_file(&self.password_path);
         let _ = std::fs::remove_file(&self.script_path);
     }

@@ -726,7 +726,7 @@ pub enum FeaturesPageAction {
     ToggleShowAutosuggestionIgnoreButton,
     ToggleAtContextMenuInTerminalMode,
     ToggleSlashCommandsInTerminalMode,
-    // Warp:`ToggleOutlineCodebaseSymbolsForAtContextMenu` 随 outline / RAG 下线删除。
+    // Warp: `ToggleOutlineCodebaseSymbolsForAtContextMenu` was removed along with outline / RAG.
     ToggleAutoOpenCodeReviewPane,
     ToggleShowTerminalInputMessageLine,
     ToggleAgentInAppNotifications,
@@ -1212,8 +1212,8 @@ impl FeaturesPageAction {
                         .value(),
                 ),
             },
-            // Warp:ToggleOutlineCodebaseSymbolsForAtContextMenu 已下线,
-            // telemetry 分支一并删除。
+            // Warp: ToggleOutlineCodebaseSymbolsForAtContextMenu has been taken offline,
+            // and the telemetry branch was removed too.
             Self::MakeWarpDefaultTerminal => TelemetryEvent::FeaturesPageAction {
                 action: "MakeWarpDefaultTerminal".to_string(),
                 value: to_string(DefaultTerminal::as_ref(ctx).is_warp_default()),
@@ -1958,8 +1958,8 @@ impl TypedActionView for FeaturesPageView {
                         .toggle_and_save_value(ctx));
                 });
             }
-            // Warp:`ToggleOutlineCodebaseSymbolsForAtContextMenu` action 随 outline
-            // 下线推退删除。
+            // Warp: the `ToggleOutlineCodebaseSymbolsForAtContextMenu` action was removed along with outline
+            // being taken offline.
             ToggleAutoOpenCodeReviewPane => {
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings
@@ -3461,7 +3461,7 @@ impl FeaturesPageView {
                     .filter(|val| {
                         *val != DefaultSessionMode::DockerSandbox || docker_sandbox_enabled
                     })
-                    // 去中心化分支:不再展示 Oz / Agent 选项。
+                    // Decentralized branch: no longer show the Oz / Agent options.
                     .filter(|val| *val != DefaultSessionMode::AmbientAgent)
                     .map(|val| {
                         DropdownItem::new(
@@ -4518,7 +4518,7 @@ impl SettingsWidget for ConversationPersistenceWidget {
     type View = FeaturesPageView;
 
     fn search_terms(&self) -> &str {
-        "persist conversations agent history database save 历史 对话 保存"
+        "persist conversations agent history database save"
     }
 
     fn render(

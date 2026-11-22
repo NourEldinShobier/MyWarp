@@ -34,10 +34,10 @@ impl std::fmt::Display for ChannelVersions {
 lazy_static! {
     static ref VERSION_RE: Regex = Regex::new(r"v(\d+)\.(.+)\.(.+)_(\d+)").unwrap();
 
-    // openWarp(OSS)发布 tag 形如 `v2026.05.26.2`(4 段:年.月.日.序号),没有
-    // 官方版本里 `_NN` 后缀和 channel 名。主正则匹配不到时再尝试这条 fallback,
-    // 让 is_current_version_ahead_of_latest_version / is_incoming_version_past_current
-    // 能正确比较大小,从而识别回滚或本地构建超前 release 的场景。
+    // openWarp (OSS) release tags look like `v2026.05.26.2` (4 segments: year.month.day.sequence) and have no
+    // `_NN` suffix or channel name like official versions. This fallback is tried when the main regex does not match,
+    // so that is_current_version_ahead_of_latest_version / is_incoming_version_past_current
+    // can compare correctly and detect rollbacks or local builds ahead of the release.
     static ref OSS_VERSION_RE: Regex =
         Regex::new(r"^v?(\d{4})\.(\d{1,2})\.(\d{1,2})(?:\.(\d+))?$").unwrap();
 
@@ -91,8 +91,8 @@ fn parse_oss(value: &str) -> Option<ParsedVersion> {
         .get(4)
         .and_then(|m| m.as_str().parse::<usize>().ok())
         .unwrap_or(0);
-    // OSS 没有 major 段;统一记为 0,这样和官方 tag(major>=0)用同一个 Ord 比较时
-    // 不会发生 OSS 版本被错误判定"大于"官方版本的情况。
+    // OSS has no major segment; it is recorded as 0 so that comparing with official tags (major>=0) using the same Ord
+    // never judges an OSS version as "greater than" an official version by mistake.
     Some(ParsedVersion {
         major: 0,
         date,

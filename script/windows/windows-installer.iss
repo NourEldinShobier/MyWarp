@@ -17,7 +17,7 @@
   #define ReleaseChannel "dev"
 #endif
 #ifndef AppUserModelId
-  ; 默认跟随官方 channel 的 `dev.warp.*` 命名;OSS 在 bundle.ps1 里会覆盖为 `dev.warp.Warp`。
+  ; Defaults to the official channel `dev.warp.*` naming; bundle.ps1 overrides it to `dev.warp.Warp` for OSS.
   #define AppUserModelId "dev.warp." + MyAppName
 #endif
 #ifndef TargetProfileDir
@@ -40,7 +40,7 @@
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
-; bundle.ps1 会为 OSS 传入 `InnoAppId=warp`,其他 channel 走默认的 `warp-terminal-{ReleaseChannel}`。
+; bundle.ps1 passes `InnoAppId=warp` for OSS; other channels use the default `warp-terminal-{ReleaseChannel}`.
 #ifndef InnoAppId
   #define InnoAppId "warp-terminal-" + ReleaseChannel
 #endif

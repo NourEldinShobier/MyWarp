@@ -255,8 +255,8 @@ impl PassiveSuggestionsModel {
             return;
         };
 
-        // BYOP 路径:把 ServerApi 调用替换为 BYOP one-shot completion。
-        // Warp 已剥离 Warp Inc 云端,无 BYOP 配置时静默 no-op。
+        // BYOP path: replaces the ServerApi call with a BYOP one-shot completion.
+        // Warp has stripped the Warp Inc cloud; without BYOP configuration this is a silent no-op.
         let Some(rendered) = build_prompt_suggestions_byop_request(
             &block_completed,
             execution_context,
@@ -628,9 +628,9 @@ fn build_prompt_suggestions_request(
     })
 }
 
-/// BYOP 路径的 prompt_suggestions 请求构造:抽出 block 信息 + 系统上下文,
-/// 委托给 `active_ai::prompt_suggestions::dispatch` 渲染 prompt 并解 BYOP 配置。
-/// 返回 `None` 表示没有 BYOP 配置或 block 内容丢失,调用方静默 no-op。
+/// Builds the prompt_suggestions request on the BYOP path: extracts block info + system context,
+/// delegates to `active_ai::prompt_suggestions::dispatch` to render the prompt and resolve the BYOP configuration.
+/// Returns `None` when there is no BYOP configuration or the block content is missing; the caller silently no-ops.
 fn build_prompt_suggestions_byop_request(
     block: &UserBlockCompleted,
     execution_context: WarpAiExecutionContext,

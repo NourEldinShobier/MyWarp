@@ -1,5 +1,5 @@
-// Warp:telemetry 发送层与 context provider 已删除。
-// 这里仅保留 `TelemetryEvent` 枚举及其辅助类型,作为大量 UI/模型调用点的类型壳。
+// Warp: the telemetry sending layer and context provider have been removed.
+// Only the `TelemetryEvent` enum and its helper types remain, as a type shell for the many UI/model call sites.
 
 use std::collections::HashSet;
 use std::time::Duration;

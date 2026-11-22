@@ -194,20 +194,20 @@ impl Task {
         }
     }
 
-    /// Warp BYOP 专用:agent 自起 LRC 收到 snapshot 时,在 conversation 里直接
-    /// 创建一个 Server-backed subagent task。
+    /// Warp BYOP only: when an agent-started LRC receives a snapshot, directly creates
+    /// a Server-backed subagent task in the conversation.
     ///
-    /// 不能复用 `new_optimistic_cli_agent_subtask`:其产生的 `TaskImpl::Optimistic`
-    /// 在 `add_messages`(`task.rs:649-651`)/ `try_get_source`(`task.rs:627-631`)
-    /// 这类要求 source 存在的入口直接返回 `TaskNotInitialized`。上游路径靠 server 返
-    /// 回 `ApplyClientAction::CreateTask` 把 optimistic 升级为 server;BYOP 没有
-    /// server,需要本地直接构造 `api::Task` 作为 source,task 一开始就 Server-backed。
+    /// Cannot reuse `new_optimistic_cli_agent_subtask`: the `TaskImpl::Optimistic` it produces
+    /// returns `TaskNotInitialized` directly from entry points that require a source to exist,
+    /// such as `add_messages` (`task.rs:649-651`) / `try_get_source` (`task.rs:627-631`). The upstream path relies on the server
+    /// returning `ApplyClientAction::CreateTask` to upgrade the optimistic task to a server one; BYOP has no
+    /// server, so an `api::Task` must be constructed locally as the source, making the task Server-backed from the start.
     ///
-    /// `subagent_params` 用合成的 `Subagent { command_id, ... }`,让
-    /// `is_subagent_task_finished` 等查询不至于全部走 `SubagentTaskNotFound` 分支。
-    /// `tool_call_id` 用新 uuid,实际上 root.messages 里没有对应 ToolCall,所以
-    /// `is_subagent_task_finished` 会一直返回 `Ok(false)`(未完成)—— LRC 在跑期间
-    /// 语义上确实是"未完成",`BlockCompleted` 钩子会在 LRC 真结束时清理。
+    /// `subagent_params` uses a synthetic `Subagent { command_id, ... }` so that
+    /// queries such as `is_subagent_task_finished` do not all fall into the `SubagentTaskNotFound` branch.
+    /// `tool_call_id` uses a fresh uuid; root.messages has no matching ToolCall, so
+    /// `is_subagent_task_finished` always returns `Ok(false)` (not finished). While the LRC is running
+    /// that is semantically correct ("not finished"), and the `BlockCompleted` hook cleans up when the LRC really ends.
     pub(super) fn new_byop_silent_cli_subtask(block_id: BlockId, parent_task_id: String) -> Self {
         let task_id_str = Uuid::new_v4().to_string();
         let subagent_call = api::message::tool_call::Subagent {

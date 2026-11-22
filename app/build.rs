@@ -337,13 +337,13 @@ fn copy_windows_assets(target_dir: &Path) {
         .expect("Could not copy platform OpenConsole.exe");
 }
 
-/// 把 `GIT_RELEASE_TAG`(如 `v2026.05.10.preview` 或 `v0`)解析成
-/// Windows VERSIONINFO 需要的 4 段 16-bit 数字。不识别的段(如
-/// "preview")跳过,不足 4 段补 0。
+/// Parses `GIT_RELEASE_TAG` (e.g. `v2026.05.10.preview` or `v0`) into
+/// the four 16-bit numbers Windows VERSIONINFO needs. Unrecognized segments (e.g.
+/// "preview") are skipped; missing segments are padded with 0.
 ///
-/// 为什么要认真填不是都填 1.0.0.0:Windows Shell / Defender / SmartScreen
-/// 会拿这个数值 FILEVERSION 与 installer `MyAppVersion`(字符串形式的同一
-/// `GIT_RELEASE_TAG`)做一致性校验,不一致会被走额外 reputation/cache miss 路径。
+/// Why fill these in properly instead of using 1.0.0.0: Windows Shell / Defender / SmartScreen
+/// compare this numeric FILEVERSION against the installer's `MyAppVersion` (the same
+/// `GIT_RELEASE_TAG` in string form); a mismatch takes an extra reputation/cache-miss path.
 #[cfg(windows)]
 fn parse_file_version_quad(tag: &str) -> (u16, u16, u16, u16) {
     let stripped = tag.strip_prefix('v').unwrap_or(tag);
@@ -363,18 +363,18 @@ fn embed_resource_file(target_dir: &Path) {
     use std::io::Write;
 
     let version = env::var("GIT_RELEASE_TAG").unwrap_or("v0".to_owned());
-    // 默认值与 publisher 一致定为「Warp」,与 `script/windows/bundle.ps1` OSS 分支
+    // The default matches the publisher, "Warp", and is aligned globally with the `script/windows/bundle.ps1` OSS branch
     // (`$APP_NAME = 'Warp'`) + AUMID `dev.warp.Warp` + Cargo bundle
-    // metadata 全局对齐。Windows 任务管理器的进程分组名实际取自 PE 资源中的
-    // `FileDescription` / `ProductName`(不是窗口标题),所以这里若回退默认 "Warp",
-    // 直接 `cargo build` 出来的 dev 二进制在任务管理器里会显示成 `Warp(N)`。
-    // 上游官方流水线在调用前会显式 `export WARP_APP_NAME=...` 覆盖,不受影响。
+    // metadata. The Windows Task Manager process group name is actually taken from the PE resource
+    // `FileDescription` / `ProductName` (not the window title), so if this fell back to the default "Warp",
+    // a dev binary from a plain `cargo build` would show up in Task Manager as `Warp(N)`.
+    // The official upstream pipeline explicitly overrides this with `export WARP_APP_NAME=...` before the call, so it is unaffected.
     let app_name = env::var("WARP_APP_NAME").unwrap_or_else(|_| "Warp".to_owned());
     let bin_name = env::var("CARGO_BIN_NAME").unwrap_or("oss".to_owned());
-    // 以 `WARP_APP_PUBLISHER` 覆盖;默认与 installer / AUMID 一致为「Warp」。
-    // 保持 installer `MyAppPublisher`、Cargo bundle metadata `copyright`、
-    // 进程 AUMID `dev.warp.Warp` 三处全局对齐，避免 Windows Shell
-    // 因 publisher / product name fingerprint 不一致而 miss 掉 icon cache。
+    // Override with `WARP_APP_PUBLISHER`; the default matches the installer / AUMID, "Warp".
+    // Keep the installer `MyAppPublisher`, Cargo bundle metadata `copyright`, and
+    // the process AUMID `dev.warp.Warp` aligned in all three places, to avoid the Windows Shell
+    // missing the icon cache because the publisher / product name fingerprint differs.
     let publisher = env::var("WARP_APP_PUBLISHER").unwrap_or_else(|_| "Warp".to_owned());
     let (ver_major, ver_minor, ver_patch, ver_build) = parse_file_version_quad(&version);
 

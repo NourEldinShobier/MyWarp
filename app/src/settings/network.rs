@@ -1,28 +1,28 @@
-//! 全局 HTTP 网络代理设置。
+//! Global HTTP network proxy settings.
 //!
-//! 见 Issue #72。提供一个用户可配置的全局代理项,值会注入到 `http_client::Client`
-//! 与 `websocket` 两个出口,从而覆盖所有 BYOP 调用、autoupdate、对话加载、
-//! MCP OAuth、cloud workflow fetch 等出站 HTTP/WS 请求。
+//! See Issue #72. Provides a user-configurable global proxy item whose value is injected into the `http_client::Client`
+//! and `websocket` egress points, thereby covering all BYOP calls, autoupdate, conversation loading,
+//! MCP OAuth, cloud workflow fetch and other outbound HTTP/WS requests.
 //!
-//! 三个字段:
-//! - `proxy_mode`: `system` / `custom` / `off`(默认 `system`,等价 reqwest 的
-//!   既有行为)。
-//! - `proxy_url`:`Custom` 模式下使用,例如 `http://proxy.corp:8080`。
-//! - `proxy_no_proxy`:逗号分隔的 host 例外列表,例如 `localhost,127.0.0.1,.internal`。
+//! Three fields:
+//! - `proxy_mode`: `system` / `custom` / `off` (default `system`, equivalent to reqwest's
+//!   existing behavior).
+//! - `proxy_url`: used in `Custom` mode, e.g. `http://proxy.corp:8080`.
+//! - `proxy_no_proxy`: comma-separated list of host exceptions, e.g. `localhost,127.0.0.1,.internal`.
 //!
-//! 用户名 / 密码不在这里:用户名将放到一个独立 setting(或在 URL 里写),
-//! 密码走 `managed_secrets`(与 BYOP API key 同模式),由 UI 单独管理。
+//! The user name / password are not here: the user name will go into a separate setting (or be written in the URL),
+//! and the password goes through `managed_secrets` (same pattern as the BYOP API key), managed separately by the UI.
 //!
-//! 为简化第一版,这里也提供了 username 字段;password 仍由 managed_secrets 管理。
+//! To simplify the first version, a username field is also provided here; the password is still managed by managed_secrets.
 
 use serde::{Deserialize, Serialize};
 use settings::{macros::define_settings_group, SupportedPlatforms, SyncToCloud};
 
-/// 用户可见的代理模式。
+/// User-visible proxy mode.
 ///
-/// 与 `http_client::ProxyMode` / `websocket::ProxyMode` 一一对应;之所以单独
-/// 定义一份是为了配置层与基础设施层解耦,且本类型需要实现 `JsonSchema` 等
-/// settings 体系要求的 trait。
+/// Corresponds one-to-one with `http_client::ProxyMode` / `websocket::ProxyMode`; it is defined separately
+/// to decouple the config layer from the infrastructure layer, and because this type must implement `JsonSchema` and other
+/// traits required by the settings system.
 #[derive(
     Clone,
     Copy,
@@ -40,17 +40,17 @@ use settings::{macros::define_settings_group, SupportedPlatforms, SyncToCloud};
     rename_all = "snake_case"
 )]
 pub enum ProxyMode {
-    /// 强制禁用代理,包括环境变量。默认项;避免 reqwest 探测出的意外系统代理干扰本地调用。
+    /// Force-disables the proxy, including environment variables. The default; avoids unexpected system proxies detected by reqwest interfering with local calls.
     #[default]
     Off,
-    /// 跟随系统代理 / 环境变量(reqwest 默认行为)。
+    /// Follows the system proxy / environment variables (reqwest default behavior).
     System,
-    /// 使用用户填写的 URL。
+    /// Uses the URL filled in by the user.
     Custom,
 }
 
 impl ProxyMode {
-    /// 转换为 `http_client::ProxyMode`。
+    /// Converts to `http_client::ProxyMode`.
     pub fn to_http_client_mode(self) -> http_client::ProxyMode {
         match self {
             ProxyMode::System => http_client::ProxyMode::System,
@@ -59,7 +59,7 @@ impl ProxyMode {
         }
     }
 
-    /// 转换为 `websocket::ProxyMode`(独立镜像,见 websocket/proxy.rs 顶部注释)。
+    /// Converts to `websocket::ProxyMode` (an independent mirror, see the comment at the top of websocket/proxy.rs).
     pub fn to_websocket_mode(self) -> websocket::ProxyMode {
         match self {
             ProxyMode::System => websocket::ProxyMode::System,

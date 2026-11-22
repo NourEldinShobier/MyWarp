@@ -388,12 +388,12 @@ impl PassiveSuggestionsModel {
     ) {
         self.abort_pending_requests(ctx);
 
-        // Warp:暂时关闭 AgentResponseCompleted 触发的 passive suggestions 云端请求,
-        // 避免每轮 Agent 回复后都向 ${server_root_url}/ai/multi-agent 发一次必失败的 HTTP
-        // (无云端 auth + ShowSuggestions proto 动作 BYOP 无法合成)。
-        // TODO(byop-suggestions): 后续若要在 BYOP 下复刻"Suggested Workflow / Rule"芯片,
-        // 需新增独立 BYOP one-shot 链路:主流结束 → 让 LLM 输出结构化 JSON candidate
-        // → 客户端解析 → 注入 output.suggestions(参考 title_model 的实现思路)。
+        // Warp: temporarily disable the cloud request for passive suggestions triggered by AgentResponseCompleted,
+        // to avoid sending an HTTP request that is bound to fail to ${server_root_url}/ai/multi-agent after every agent reply
+        // (no cloud auth, and BYOP cannot synthesize the ShowSuggestions proto action).
+        // TODO(byop-suggestions): to recreate the "Suggested Workflow / Rule" chips under BYOP later,
+        // add a separate BYOP one-shot pipeline: main stream ends → have the LLM output structured JSON candidates
+        // → client parses → inject into output.suggestions (see the title_model implementation for reference).
         let _ = conversation_id;
         return;
         #[allow(unreachable_code)]

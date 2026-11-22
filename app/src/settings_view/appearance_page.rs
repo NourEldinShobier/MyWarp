@@ -1759,9 +1759,6 @@ impl AppearanceSettingsPageView {
         match val {
             Language::System => crate::t_static!("settings-language-system-default"),
             Language::English => crate::t_static!("settings-language-english"),
-            Language::SimplifiedChinese => "简体中文",
-            Language::Japanese => "日本語",
-            Language::Russian => "Русский",
         }
     }
 
@@ -1901,7 +1898,7 @@ impl AppearanceSettingsPageView {
         }
     }
 
-    /// 处理 markdown 标题字号系数编辑器事件
+    /// Handles markdown heading font-size scale editor events
     fn handle_markdown_heading_scale_editor_event(
         &mut self,
         event: &EditorEvent,
@@ -2101,12 +2098,12 @@ impl AppearanceSettingsPageView {
                 report_if_error!(font_settings.markdown_heading_h6_scale.set_value(clamp(v), ctx));
             }
         });
-        // 兜底:对任何 parse 失败、或 parse 成功但 clamp 后等于当前值(set_value 不发事件)的格子,
-        // 编辑框需要回到 setting 真值,避免停留在非法或越界的用户输入上。
+        // Fallback: for any cell where parsing failed, or parsing succeeded but the clamped value equals the current value (set_value emits no event),
+        // the editor must return to the real setting value so it does not stay on invalid or out-of-range user input.
         self.refresh_markdown_heading_scale_editors(ctx);
     }
 
-    /// 重置 Markdown 标题字号倍率为默认值
+    /// Resets the Markdown heading font-size multipliers to their defaults
     fn reset_markdown_heading_scale(&mut self, ctx: &mut ViewContext<Self>) {
         FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
             report_if_error!(font_settings.markdown_heading_h1_scale.clear_value(ctx));
@@ -3389,7 +3386,7 @@ impl SettingsWidget for LanguageWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "language locale 语言 中文 english русский russian 翻译 international i18n"
+        "language locale english russian translation international i18n"
     }
 
     fn render(
@@ -4896,7 +4893,7 @@ fn markdown_heading_scale_defaults() -> [f32; 6] {
 }
 
 impl MarkdownHeadingScaleWidget {
-    /// 渲染单个系数输入框
+    /// Renders a single scale input box
     fn render_scale_input(
         editor: &ViewHandle<EditorView>,
         appearance: &Appearance,
@@ -4933,7 +4930,7 @@ impl MarkdownHeadingScaleWidget {
     }
 }
 
-/// Markdown 标题字号系数设置组件
+/// Markdown heading font-size scale settings widget
 impl SettingsWidget for MarkdownHeadingScaleWidget {
     type View = AppearanceSettingsPageView;
 
@@ -4959,7 +4956,7 @@ impl SettingsWidget for MarkdownHeadingScaleWidget {
 
         let mut rows = Flex::column().with_spacing(4.);
 
-        // 标题行：标题 + 重置按钮同行
+        // Title row: title and reset button on the same line
         let title_label = appearance
             .ui_builder()
             .span(crate::t!("settings-appearance-markdown-heading-scale-label"))
@@ -5002,7 +4999,7 @@ impl SettingsWidget for MarkdownHeadingScaleWidget {
                 .finish(),
         );
 
-        // 说明文字
+        // Description text
         rows.add_child(
             appearance
                 .ui_builder()

@@ -30,13 +30,13 @@ pub struct CLIAgentConversation {
     pub block: SerializedBlock,
 }
 
-/// 已加载的本地会话数据表示。
+/// Representation of loaded local conversation data.
 ///
-/// 具体格式取决于生成该会话的 agent harness。
+/// The exact format depends on the agent harness that produced the conversation.
 pub enum LoadedConversationData {
-    /// 由 Oz harness 生成、可还原为 [`AIConversation`] 数据模型的会话。
+    /// Conversation produced by the Oz harness that can be restored into the [`AIConversation`] data model.
     Oz(Box<AIConversation>),
-    /// 由外部 CLI agent harness 生成的会话。
+    /// Conversation produced by an external CLI agent harness.
     CLIAgent(Box<CLIAgentConversation>),
 }
 
@@ -78,8 +78,8 @@ pub fn convert_persisted_conversation_to_ai_conversation_with_metadata(
 
     match AIConversation::new_restored(conversation_id, tasks, conversation_data) {
         Ok(mut conversation) => {
-            // 持久化 Task 里的旧消息可能没有 CurrentTime/timestamp,恢复 exchange 时会退到
-            // Unix epoch。SQLite 行级更新时间是这个会话最后写入的可靠兜底时间。
+            // Old messages in a persisted Task may lack CurrentTime/timestamp; restoring the exchange falls back to
+            // the Unix epoch. The SQLite row-level update time is a reliable fallback for when this conversation was last written.
             let fallback_timestamp = chrono::Local.from_utc_datetime(&last_modified_at);
             conversation.repair_default_restored_exchange_timestamps(fallback_timestamp);
             Some(conversation)

@@ -21,7 +21,7 @@ pub static NvOptimusEnablement: u32 = 1;
 #[used]
 pub static AmdPowerXpressRequestHighPerformance: u32 = 1;
 
-// Warp OSS 构建的入口,简单包一层 warp::run()。
+// Entry point of the Warp OSS build; a thin wrapper around warp::run().
 fn main() -> Result<()> {
     let mut state = ChannelState::new(
         Channel::Oss,
@@ -35,9 +35,9 @@ fn main() -> Result<()> {
     if cfg!(debug_assertions) {
         state = state.with_additional_features(DEBUG_FLAGS);
     }
-    // 始终启用 IME marked-text 渲染:winit 的 IME 路径在 macOS / Windows 都支持,
-    // 但若不在此处显式开启,Warp 会把 preedit / 输入合成更新整体丢弃,只剩 OS 的候选窗
-    // 可见 —— 在 Windows 上对日文 / 中文 / 韩文输入都属于实质性损坏。
+    // Always enable IME marked-text rendering: winit's IME path is supported on both macOS and Windows,
+    // but if it is not explicitly enabled here, Warp discards preedit / composition updates entirely, leaving only the OS candidate window
+    // visible -- on Windows this is substantially broken for Japanese / Chinese / Korean input.
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         use warp_core::features::FeatureFlag;
@@ -68,8 +68,6 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>CFBundleLocalizations</key>
     <array>
     <string>en</string>
-    <string>ja</string>
-    <string>zh-CN</string>
     </array>
     <key>CFBundleName</key>
     <string>Warp</string>

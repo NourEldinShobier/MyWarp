@@ -49,15 +49,15 @@ winget install jqlang.jq
 # CMake is needed to build native dependencies.
 winget install -e --id Kitware.CMake
 
-# Strawberry Perl 用于从源码编译 OpenSSL。warp_sftp → ssh2(openssl-on-win32)→
-# openssl-sys 的 vendored 构建会调用 perl 运行 OpenSSL 的 Configure 脚本。
-# 必须用原生 Windows perl(Strawberry),Git for Windows 自带的 cygwin perl 不适用于 MSVC 构建。
+# Strawberry Perl is used to build OpenSSL from source. warp_sftp → ssh2 (openssl-on-win32) →
+# openssl-sys's vendored build invokes perl to run OpenSSL's Configure script.
+# Native Windows perl (Strawberry) is required; the cygwin perl bundled with Git for Windows is not usable for MSVC builds.
 winget install -e --id StrawberryPerl.StrawberryPerl `
     --accept-package-agreements --accept-source-agreements
 
-# protoc(Protocol Buffers 编译器)用于 proto 依赖(如 warp_multi_agent_api)的 build.rs 代码生成。
-# 固定到与 script/linux/install_build_deps 相同的版本,保证跨平台代码生成一致;
-# prost-build 要求 protoc >= 3.15(proto3 optional 字段)。winget 的 Google.Protobuf 版本过新,故直接取官方发行版 zip。
+# protoc (the Protocol Buffers compiler) is used for build.rs code generation of proto dependencies (e.g. warp_multi_agent_api).
+# Pinned to the same version as script/linux/install_build_deps to keep cross-platform codegen consistent;
+# prost-build requires protoc >= 3.15 (proto3 optional fields). The winget Google.Protobuf version is too new, so fetch the official release zip directly.
 $protocVersion = '25.1'
 $protocDir = "$env:LOCALAPPDATA\protoc"
 $protocExe = "$protocDir\bin\protoc.exe"
@@ -67,7 +67,7 @@ if (-not (Test-Path $protocExe)) {
     Expand-Archive -Path $protocZip -DestinationPath $protocDir -Force
     Remove-Item $protocZip
 }
-# prost-build 优先读取 PROTOC 环境变量(见构建错误提示),指向固定版本二进制最稳妥。
+# prost-build prefers reading the PROTOC environment variable (see the build error hint); pointing it at the pinned-version binary is the safest.
 [Environment]::SetEnvironmentVariable('PROTOC', $protocExe, 'User')
 
 # We use InnoSetup to build our release bundle installer.

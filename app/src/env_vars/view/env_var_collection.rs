@@ -675,9 +675,9 @@ impl EnvVarCollectionView {
             title
         };
         self.set_pane_title(&title, ctx);
-        // TODO(warp-cloud-removal Phase 5): sharing UI 已退役,
-        // env_var_collection 的 ShareableObject 注入移除;ServerId 路径保留待
-        // cloud_object 整体退役。
+        // TODO(warp-cloud-removal Phase 5): the sharing UI is retired and the
+        // ShareableObject injection for env_var_collection is removed; the ServerId path is
+        // kept until cloud_object is retired as a whole.
         let _ = env_var_collection.id;
 
         let description = collection.description.clone().unwrap_or_default();

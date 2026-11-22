@@ -2963,8 +2963,8 @@ pub fn render_failed_output(props: FailedOutputProps, app: &AppContext) -> Box<d
 
     let error_text = match props.error {
         RenderableAIError::QuotaLimit => {
-            // Warp(Phase 3c A1):删除 QuotaLimit 中依赖 `AIRequestUsageModel`
-            // 渲染刷新时间的逻辑。本地化后云端额度不适用，仅保留通用错误文案。
+            // Warp (Phase 3c A1): removed the logic in QuotaLimit that depended on `AIRequestUsageModel`
+            // to render the refresh time. After localization cloud quota does not apply, so only the generic error text is kept.
             format!("{ERROR_APOLOGY_TEXT}\n\n{INTERNAL_WARP_ERROR}")
         }
         RenderableAIError::ServerOverloaded => {
@@ -3356,10 +3356,10 @@ pub(crate) fn render_debug_footer<V: View>(
     );
     debug_row.add_child(copy_button_with_tooltip);
 
-    // Warp: 不再用 `Expanded` —— alt-screen / 长命令 take-over 场景下,父容器
-    // 沿主轴是 infinite constraint(BYOP error block 渲染路径),`Flex + Expanded`
-    // 直接 panic `flex contains flexible children but has an infinite constraint`。
-    // debug_row 本身宽度由内部 Shrinkable 控制,不需要主动撑满父级。
+    // Warp: no longer use `Expanded`. In alt-screen / long-command take-over scenarios, the parent container
+    // has an infinite constraint along the main axis (BYOP error block render path), and `Flex + Expanded`
+    // panics directly with `flex contains flexible children but has an infinite constraint`.
+    // debug_row's width is controlled by its inner Shrinkable and does not need to fill the parent.
     if let Some(submit_button) = stacked_submit_button {
         let mut column = Flex::column();
         column.add_child(debug_row.finish());
@@ -3457,10 +3457,10 @@ pub(super) fn query_prefix_highlight_len(
     }
 }
 
-/// 决定当前 block 的用户提问气泡是否应该渲染出来。
+/// Decides whether the current block's user question bubble should be rendered.
 ///
-/// 当 "Hide responses" 开启时，这里也要一起隐藏提问本身，避免界面只藏输出
-/// 不藏输入，造成用户看到残留的发送内容。
+/// When "Hide responses" is on, the question itself must be hidden too, to avoid the UI hiding only the output
+/// but not the input, leaving the user to see leftover sent content.
 pub(super) fn should_render_query_and_header(
     query_and_index_is_some: bool,
     should_hide_first_block_query_and_header: bool,

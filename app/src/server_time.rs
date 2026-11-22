@@ -32,10 +32,10 @@ impl From<DateTime<Utc>> for ServerTimestamp {
     }
 }
 
-/// 本地估算的服务端时间。
+/// Locally estimated server time.
 ///
-/// Warp 不再请求云端 `/current_time`;启动路径用本地当前时间初始化,调用方仍可
-/// 通过该类型获得随单调时钟推进的 wall-clock 时间。
+/// Warp no longer requests the cloud `/current_time`; the startup path initializes with the local current time, and callers can still
+/// get a wall-clock time from this type that advances with the monotonic clock.
 #[derive(Debug, Clone)]
 pub struct ServerTime {
     time_at_fetch: DateTime<FixedOffset>,

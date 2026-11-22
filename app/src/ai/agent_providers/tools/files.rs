@@ -1,7 +1,7 @@
-//! `ReadFiles` 适配。
+//! `ReadFiles` adapter.
 //!
-//! warp 中对应 `api::message::tool_call::Tool::ReadFiles`,
-//! 执行后 result 是 `ToolCallResultType::ReadFiles(ReadFilesResult)`。
+//! In warp this corresponds to `api::message::tool_call::Tool::ReadFiles`;
+//! after execution the result is `ToolCallResultType::ReadFiles(ReadFilesResult)`.
 
 use anyhow::Result;
 use serde::Deserialize;

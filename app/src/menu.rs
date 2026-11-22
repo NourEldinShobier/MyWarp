@@ -2260,8 +2260,8 @@ impl<A: Action + Clone> Menu<A> {
         self.menu.with_height(height);
     }
 
-    /// 运行时切换菜单变体（例如把同一个 `Menu` 实例临时切到 `Scrollable`
-    /// 给 OneKey 密码候选弹窗使用,关闭后再切回 `Fixed`)。
+    /// Switches the menu variant at runtime (for example temporarily switching the same `Menu` instance to `Scrollable`
+    /// for the OneKey password candidate popup, then back to `Fixed` after closing).
     pub fn set_menu_variant(&mut self, menu_variant: MenuVariant) {
         self.menu.with_menu_variant(menu_variant);
     }
@@ -2477,14 +2477,14 @@ impl<A: Action + Clone> SubMenu<A> {
         }
     }
 
-    /// 在嵌套 submenu 中向下路由指针事件。
+    /// Routes pointer events downward through nested submenus.
     ///
-    /// `handle_action` 总是在根 menu(`depth == 0`)上被调用,但鼠标
-    /// hover / leaf / unhover 事件的 `depth` 可以是任意嵌套层次。
-    /// 这个函数沿着"当前选中的 submenu"链路递归查找实际该处理
-    /// 事件的层级,然后把事件转给它。如果中间某层没有选中的
-    /// submenu 或者 depth 不匹配,则丢弃。返回 `true` 表示事件已被某
-    /// 层级处理,上层 `handle_action` 不需要再走本身的事件分发。
+    /// `handle_action` is always called on the root menu (`depth == 0`), but the `depth` of mouse
+    /// hover / leaf / unhover events can be at any nesting level.
+    /// This function walks the chain of "currently selected submenu" recursively to find the level that should actually handle
+    /// the event, then forwards the event to it. If some level has no selected
+    /// submenu or the depth does not match, the event is dropped. Returns `true` if the event was handled by some
+    /// level, so the upper-level `handle_action` does not need to dispatch it itself.
     fn delegate_pointer_action_to_selected_submenu(
         &mut self,
         action: &MenuAction,
@@ -2509,7 +2509,7 @@ impl<A: Action + Clone> SubMenu<A> {
             return false;
         };
         if submenu.depth > event_depth {
-            // 下一层 submenu 已经超过了事件目标层级,事件丢弃。
+            // The next-level submenu is already past the event's target level; drop the event.
             return false;
         }
         submenu.handle_action(action, dispatch_item_actions, position_namespace, ctx);

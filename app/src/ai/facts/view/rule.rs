@@ -47,7 +47,7 @@ use warpui::{
 use super::style;
 use crate::ai::facts::{AIFact, AIFactObject, AIFactObjectModel, AIMemory};
 
-// 顶部标题保留英文 "Rules"(用户偏好,不译为知识库)。
+// The top title stays in English "Rules" (user preference; not translated to "knowledge base").
 pub const HEADER_TEXT: &str = "Rules";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -146,10 +146,10 @@ pub struct RuleView {
 
 impl RuleView {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
-        // Warp(本地化,Phase 2d-1):原 UpdateManager 订阅用来接收云端创建/更新的 ack
-        // 事件、以及网络状态驱动的面板重绘。本地化后 ObjectStoreEvent 已覆盖本地写入后的
-        // UI 刷新需求(2c-2/2c-3 在 update_object/create_object 里发送),UpdateManager 与
-        // NetworkStatus 订阅为死代码,一并移除。
+        // Warp (localization, Phase 2d-1): the original UpdateManager subscription received acks for cloud create/update
+        // events and network-status-driven panel redraws. After localization ObjectStoreEvent already covers the UI refresh
+        // needed after local writes (2c-2/2c-3 send it in update_object/create_object); the UpdateManager and
+        // NetworkStatus subscriptions are dead code and are removed together.
         let object_store_model = ObjectStoreModel::handle(ctx);
         ctx.subscribe_to_model(&object_store_model, |me, _, event, ctx| {
             me.handle_object_store_event(event, ctx);
@@ -604,8 +604,8 @@ impl RuleView {
             .finish()
     }
 
-    // Warp(本地化,Phase 2d-1):原 `render_sync_status_icon` 依赖 `SyncQueue::is_dequeueing()`
-    // 与 `is_syncing` 谓词,本地化后永不会出现 "同步中" 状态,整体移除。
+    // Warp (localization, Phase 2d-1): the original `render_sync_status_icon` depended on `SyncQueue::is_dequeueing()`
+    // and the `is_syncing` predicate; after localization a "syncing" state never occurs, so it is removed entirely.
 
     fn render_project_based_row(
         &self,
@@ -732,8 +732,8 @@ impl RuleView {
                 .finish()
         });
 
-        // Warp(本地化,Phase 2d-1):原 `is_edit_allowed` 依赖网络在线+server_id 两个纬度,
-        // 本地化后规则永远可编辑,点击动作无条件挂载。
+        // Warp (localization, Phase 2d-1): the original `is_edit_allowed` depended on two dimensions, network online and server_id;
+        // after localization rules are always editable, so the click action is attached unconditionally.
         hoverable
             .with_cursor(Cursor::PointingHand)
             .on_click(move |ctx, _, _| {

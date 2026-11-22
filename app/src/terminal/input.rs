@@ -2277,7 +2277,7 @@ impl Input {
                     ctx.emit(Event::RegisterPluginListener(*agent));
                 }
                 // Warp Wave 7-3:`AgentInputFooterEvent::OpenEnvironmentManagementPane` handler
-                // 随 ambient-agent UI 子系统物理删。
+                // Physically removed together with the ambient-agent UI subsystem.
                 #[cfg(not(target_family = "wasm"))]
                 AgentInputFooterEvent::OpenPluginInstructionsPane(agent, kind) => {
                     ctx.emit(Event::OpenPluginInstructionsPane(*agent, *kind));
@@ -12168,7 +12168,7 @@ impl Input {
             }
         };
 
-        let _ = (processed_input, processed_output); // 历史 ServerApi 路径用,BYOP one-shot 仅取 last_block 摘要
+        let _ = (processed_input, processed_output); // Used by the legacy ServerApi path; BYOP one-shot only takes the last_block summary
 
         let am_query_input_buffer = self.editor.as_ref(ctx).buffer_text(ctx);
         let Some(session) = self.active_session(ctx) else {
@@ -12176,7 +12176,7 @@ impl Input {
         };
         let context = WarpAiExecutionContext::new(&session);
 
-        // BYOP 路径:替换 ServerApi::predict_am_queries 为 BYOP one-shot completion。
+        // BYOP path: replace ServerApi::predict_am_queries with a BYOP one-shot completion.
         let last_block = crate::ai::agent_providers::active_ai::LastBlockSnippet {
             command: block.command.clone(),
             exit_code: exit_code.value(),

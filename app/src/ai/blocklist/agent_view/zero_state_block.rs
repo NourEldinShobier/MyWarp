@@ -59,7 +59,7 @@ struct StateHandles {
     exit: MouseStateHandle,
     init_callout: MouseStateHandle,
     recent_conversations: [MouseStateHandle; MAX_RECENT_CONVERSATION_COUNT],
-    // 标题右侧「×」按钮的 hover 状态句柄，点击后永久隐藏零状态快捷键提示。
+    // Hover state handle for the "×" button on the right of the title; clicking it permanently hides the zero-state shortcut hints.
     hide_hints: MouseStateHandle,
 }
 
@@ -149,7 +149,7 @@ impl AgentViewZeroStateBlock {
             },
         );
 
-        // 监听「显示 Agent 快捷键提示」设置变化，点击 × 后立即重渲染以隐藏提示。
+        // Listen for changes to the "Show Agent shortcut hints" setting; after clicking × re-render immediately to hide the hints.
         ctx.subscribe_to_model(&InputSettings::handle(ctx), |_, _, event, ctx| {
             if matches!(
                 event,
@@ -326,8 +326,8 @@ impl View for AgentViewZeroStateBlock {
             return Empty::new().finish();
         }
 
-        // 用户点「×」永久关闭后，整个零状态区域（标题 / 描述 / 快捷键三件套 / 最近对话
-        // / init callout）都不渲染，避免留下一块空白区。如需恢复可在设置中重新开启。
+        // After the user clicks "×" to close permanently, the whole zero-state area (title / description / shortcut trio / recent conversations
+        // / init callout) is not rendered, to avoid leaving a blank block. It can be re-enabled in settings.
         if !*InputSettings::as_ref(app).show_agent_zero_state_hints {
             return Empty::new().finish();
         }
@@ -355,7 +355,7 @@ impl View for AgentViewZeroStateBlock {
             } else {
                 Icon::Oz
             },
-            // ambient agent 不提供 × 按钮，其余场景都在标题右侧展示。
+            // ambient agent does not provide the × button; all other cases show it on the right of the title.
             hide_hints_state: (!self.origin.is_ambient_agent())
                 .then(|| self.state_handles.hide_hints.clone()),
         };
@@ -421,8 +421,8 @@ pub enum AgentViewZeroStateAction {
     OpenConversation {
         conversation_id: AIConversationId,
     },
-    /// 点击标题右侧「×」按钮：永久隐藏零状态快捷键提示（包含 message bar 那一排）。
-    /// 用户可在「设置 → Warp 智能体 → AI 输入」中重新开启。
+    /// Click the "×" button on the right of the title: permanently hides the zero-state shortcut hints (including the message bar row).
+    /// The user can re-enable it in "Settings → Warp Agent → AI Input".
     HideZeroStateHints,
 }
 
@@ -443,7 +443,7 @@ impl TypedActionView for AgentViewZeroStateBlock {
                 InputSettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings.show_agent_zero_state_hints.set_value(false, ctx));
                 });
-                // 设置订阅会触发 ctx.notify，这里不重复发。
+                // The settings subscription triggers ctx.notify, so do not send it again here.
             }
         }
     }
@@ -486,7 +486,7 @@ struct HeaderProps {
     title: Cow<'static, str>,
     description: AgentViewDescription,
     icon: Icon,
-    /// 若为 Some，在标题行右侧渲染一个 × 按钮用于隐藏零状态快捷键提示。
+    /// If Some, renders a × button on the right of the title row to hide the zero-state shortcut hints.
     hide_hints_state: Option<MouseStateHandle>,
 }
 
@@ -530,9 +530,9 @@ fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box
         );
 
     if let Some(hide_hints_state) = hide_hints_state {
-        // spacer 把 × 按钮推到标题行最右侧。
+        // The spacer pushes the × button to the far right of the title row.
         title_row = title_row.with_child(Expanded::new(1., Empty::new().finish()).finish());
-        // × 按钮：hover 时高亮颜色，点击 dispatch HideZeroStateHints 写入设置。
+        // × button: highlights on hover; click dispatches HideZeroStateHints to write the setting.
         let icon_size = appearance.monospace_font_size();
         let close_button = Hoverable::new(hide_hints_state, move |state| {
             let bg = theme.background();

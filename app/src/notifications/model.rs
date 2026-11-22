@@ -1,16 +1,16 @@
-//! 通知中心数据模型(单例 Singleton)。
+//! Notification center data model (Singleton).
 //!
-//! 002ce467 cloud-removal 删除 `agent_management` 时把这个 model 一并清掉了,但
-//! - 软件本体的 BYOP agent (Oz) 完成/出错通知
-//! - 第三方 CLI agent (Claude / Codex / DeepSeek 等) 状态通知
+//! 002ce467 cloud-removal deleted `agent_management` and removed this model along with it, but
+//! - completion/error notifications from the in-app BYOP agent (Oz)
+//! - status notifications from third-party CLI agents (Claude / Codex / DeepSeek, etc.)
 //!
-//! 仍需要走通知中心。本模块是删前 `AgentNotificationsModel` 的精简版:
-//! - 去掉了 `ActiveAgentViewsModel` 订阅(该 model 是云端管理 view 的状态来源,已删)。
-//!   原本用 `is_conversation_open` 判断"对话视图是否还开着",改成查
-//!   `BlocklistAIHistoryModel::conversation()` 判断"对话是否还在内存里"。
-//! - 去掉了 `AgentManagementEvent::ConversationNeedsAttention`(legacy toast 路径,
-//!   已被 mailbox/toast_stack 取代)。
-//! - 去掉了 `should_trigger_notification` legacy 判断(只走 mailbox 路径)。
+//! still need to go through the notification center. This module is a slimmed-down version of the pre-removal `AgentNotificationsModel`:
+//! - Dropped the `ActiveAgentViewsModel` subscription (that model was the state source for the cloud management view, now deleted).
+//!   `is_conversation_open` used to decide "is the conversation view still open"; it now checks
+//!   `BlocklistAIHistoryModel::conversation()` to decide "is the conversation still in memory".
+//! - Dropped `AgentManagementEvent::ConversationNeedsAttention` (legacy toast path,
+//!   replaced by mailbox/toast_stack).
+//! - Dropped the `should_trigger_notification` legacy check (only the mailbox path remains).
 
 use std::collections::HashMap;
 
@@ -35,15 +35,15 @@ use crate::workspace::util::is_terminal_view_in_same_tab;
 use crate::workspace::{Workspace, WorkspaceRegistry};
 use crate::BlocklistAIHistoryModel;
 
-/// 通知中心的单例 model:
-/// - 在 BYOP agent 对话状态(`BlocklistAIHistoryModel`)和 CLI agent 会话状态
-///   (`CLIAgentSessionsModel`)发生关键变化时往 mailbox 推通知;
-/// - 维护 `pending_artifacts`(每个对话当前 turn 累积的 artifact),并在终态时
-///   随通知一起 flush。
+/// Singleton model for the notification center:
+/// - pushes notifications into the mailbox on key changes in BYOP agent conversation state (`BlocklistAIHistoryModel`) and CLI agent session state
+///   (`CLIAgentSessionsModel`);
+/// - maintains `pending_artifacts` (artifacts accumulated during each conversation's current turn) and flushes them
+///   together with the notification on a terminal state.
 pub struct NotificationsModel {
     notifications: NotificationItems,
-    /// 当前 turn 累积的 artifact;在终态(Success/Cancelled/Error)时 drain 进通知,
-    /// InProgress 时清空。
+    /// Artifacts accumulated in the current turn; drained into the notification on a terminal state (Success/Cancelled/Error),
+    /// cleared on InProgress.
     pub(crate) pending_artifacts: HashMap<AIConversationId, Vec<Artifact>>,
 }
 
@@ -87,7 +87,7 @@ impl NotificationsModel {
         }
     }
 
-    /// 把指定 terminal view 上的所有通知标记为已读。
+    /// Marks all notifications on the given terminal view as read.
     pub(crate) fn mark_items_from_terminal_view_read(
         &mut self,
         terminal_view_id: EntityId,
@@ -131,7 +131,7 @@ impl NotificationsModel {
                 status,
                 session_context,
             } => match status {
-                // agent 重新开始干活 → 之前的通知作废。
+                // Agent started working again -> earlier notifications are obsolete.
                 CLIAgentSessionStatus::InProgress => {
                     self.remove_notification_by_source(
                         NotificationOrigin::CLISession(*terminal_view_id),
@@ -185,7 +185,7 @@ impl NotificationsModel {
         event: &BlocklistAIHistoryEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        // 对话被显式删除 / ephemeral 清理时,顺手清掉它的通知和 pending artifact。
+        // When a conversation is explicitly deleted / cleaned up as ephemeral, also clear its notifications and pending artifacts.
         if let BlocklistAIHistoryEvent::DeletedConversation {
             conversation_id, ..
         }
@@ -203,7 +203,7 @@ impl NotificationsModel {
             return;
         }
 
-        // Artifact 在 turn 内增量到达时累积起来。
+        // Accumulate artifacts as they arrive incrementally within a turn.
         if let BlocklistAIHistoryEvent::UpdatedConversationArtifacts {
             conversation_id,
             artifact,
@@ -222,7 +222,7 @@ impl NotificationsModel {
         let BlocklistAIHistoryEvent::UpdatedConversationStatus {
             terminal_view_id,
             conversation_id,
-            // 启动恢复对话不应触发通知。
+            // Restoring conversations at startup should not trigger notifications.
             is_restored: false,
         } = event
         else {
@@ -263,8 +263,8 @@ impl NotificationsModel {
     ) {
         let origin = NotificationOrigin::Conversation(conversation_id);
 
-        // 对话在内存里已经不存在(被 evict / 删除) → 没有可导航的目标,直接清掉相关通知。
-        // 这里替代了原 `ActiveAgentViewsModel::is_conversation_open` 检查。
+        // The conversation no longer exists in memory (evicted / deleted) -> nothing to navigate to, so clear related notifications directly.
+        // This replaces the original `ActiveAgentViewsModel::is_conversation_open` check.
         if BlocklistAIHistoryModel::as_ref(ctx)
             .conversation(&conversation_id)
             .is_none()
@@ -277,7 +277,7 @@ impl NotificationsModel {
         let title = latest_query.unwrap_or_else(|| "Agent task".to_owned());
 
         match status {
-            // agent 重新开始干活 → 之前的通知作废。
+            // Agent started working again -> earlier notifications are obsolete.
             ConversationStatus::InProgress => {
                 self.remove_notification_by_source(origin, ctx);
             }
@@ -335,7 +335,7 @@ impl NotificationsModel {
         }
     }
 
-    /// 删除指定 source 的现有通知(若有),并 emit 更新事件。
+    /// Removes the existing notification for the given source (if any) and emits an update event.
     fn remove_notification_by_source(
         &mut self,
         origin: NotificationOrigin,
@@ -346,7 +346,7 @@ impl NotificationsModel {
         }
     }
 
-    /// drain 出指定对话当前 turn 累积的 artifact。
+    /// Drains the artifacts accumulated in the given conversation's current turn.
     pub(crate) fn flush_pending_artifacts(
         &mut self,
         conversation_id: AIConversationId,
@@ -400,11 +400,11 @@ impl NotificationsModel {
 
 #[derive(Clone, Debug)]
 pub enum NotificationsEvent {
-    /// 通知中心新增了一条通知。
+    /// A notification was added to the notification center.
     NotificationAdded { id: NotificationId },
-    /// 通知的已读状态变了。
+    /// A notification's read state changed.
     NotificationUpdated,
-    /// 全部标记为已读。
+    /// All notifications were marked as read.
     AllNotificationsMarkedRead,
 }
 

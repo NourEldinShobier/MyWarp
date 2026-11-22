@@ -109,10 +109,10 @@ pub struct PromptSuggestionBannerState {
     /// The server request token, used to construct a debug link (dogfood only).
     pub server_request_token: Option<String>,
 
-    /// Warp BYOP:模型主动调 `suggest_prompt` 工具产生的 chip 携带 action_id,
-    /// accept/reject 时需要调 `complete_suggest_prompt_action` 关闭 oneshot channel
-    /// 让 BYOP loop 拿到 result 继续下一轮。`None` 表示这条 chip 来自其他路径
-    /// (例如 MAA 服务端被动建议),不需要走 BYOP 完成回写。
+    /// Warp BYOP: chips produced when the model proactively calls the `suggest_prompt` tool carry an action_id;
+    /// on accept/reject, `complete_suggest_prompt_action` must be called to close the oneshot channel
+    /// so that the BYOP loop gets the result and continues to the next round. `None` means this chip comes from another path
+    /// (e.g. MAA server-side passive suggestions) and does not need the BYOP completion write-back.
     pub byop_action_id: Option<crate::ai::agent::AIAgentActionId>,
 }
 

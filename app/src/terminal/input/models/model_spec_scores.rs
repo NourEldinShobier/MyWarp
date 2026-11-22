@@ -24,16 +24,16 @@ pub struct ModelSpecScoresLayout {
     pub bg_bar_color: ColorU,
 }
 
-/// 给 BYOP(自定义 provider)模型渲染的 spec 面板。
+/// Spec panel rendered for BYOP (custom provider) models.
 ///
-/// 视觉与 [`render_model_spec_scores`] 完全一致(同样的 `render_score_row` 私有 helper),
-/// 只是行的语义不同:
-/// - Context — 上下文窗口,bar 用 log2 归一化映射到 4K..2M
-/// - Output  — 单次最大输出,bar 用 log2 归一化映射到 1K..128K
-/// - Cost    — 强制走 `BilledToApi` 分支(BYOP 用户用自己的 key,不走 Warp 计费)
+/// Visually identical to [`render_model_spec_scores`] (same private `render_score_row` helper),
+/// only the row semantics differ:
+/// - Context — context window; the bar is log2-normalized and mapped to 4K..2M
+/// - Output  — max output per call; the bar is log2-normalized and mapped to 1K..128K
+/// - Cost    — forced onto the `BilledToApi` branch (BYOP users use their own key, not Warp billing)
 ///
-/// `context_window` / `max_output_tokens` 为 0(未填) 时传 None,显示默认 "?" 占位,
-/// 与 Warp 默认面板缺失数据时的视觉行为一致。
+/// When `context_window` / `max_output_tokens` is 0 (not filled in), pass None and show the default "?" placeholder,
+/// matching the visual behavior of Warp's default panel when data is missing.
 pub fn render_byop_spec_scores(
     context_window: Option<u32>,
     max_output_tokens: Option<u32>,
@@ -72,7 +72,7 @@ pub fn render_byop_spec_scores(
         .finish()
 }
 
-/// log2 归一化: 4K..2M tokens → 0..1。0 / 越界由 caller 用 `Option<u32>` 控制。
+/// log2 normalization: 4K..2M tokens → 0..1. 0 / out-of-range handled by the caller via `Option<u32>`.
 fn normalize_context_window(ctx: u32) -> f32 {
     if ctx == 0 {
         return 0.0;
@@ -83,7 +83,7 @@ fn normalize_context_window(ctx: u32) -> f32 {
     ((l - lo) / (hi - lo)).clamp(0.0, 1.0)
 }
 
-/// log2 归一化: 1K..128K tokens → 0..1。
+/// log2 normalization: 1K..128K tokens → 0..1.
 fn normalize_max_output(out: u32) -> f32 {
     if out == 0 {
         return 0.0;

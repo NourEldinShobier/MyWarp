@@ -1,2 +1,3 @@
--- Warp 不维护 down 迁移:LSP 与持久化 workspace 历史已永久下线,
--- 不存在合理的回滚目标。保留此空文件以满足 diesel migration 目录约定。
+-- Warp does not maintain a down migration: LSP and persisted workspace history have been
+-- permanently removed, so there is no sensible rollback target. This empty file is kept to
+-- satisfy the diesel migration directory convention.

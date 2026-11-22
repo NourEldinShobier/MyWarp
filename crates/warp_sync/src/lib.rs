@@ -1,4 +1,4 @@
-//! warp_sync - 云同步通用基础设施
+//! warp_sync - generic cloud sync infrastructure
 //!
 // author: logic
 // date: 2026-05-24

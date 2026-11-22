@@ -1,26 +1,26 @@
-//! # Warp 本地化说明(Phase 2d-4b,2026-05-11 修订)
+//! # Warp localization notes (Phase 2d-4b, revised 2026-05-11)
 //!
-//! 本模块在上游 Warp 中承担 "云对象" 抽象,统一描述 Notebook / Workflow / EnvVar /
-//! Fact / MCP / ExecutionProfile / AIDocument 等需要在多设备间同步的对象类型。
+//! In upstream Warp this module provides the "cloud object" abstraction, uniformly describing Notebook / Workflow / EnvVar /
+//! Fact / MCP / ExecutionProfile / AIDocument and other object types that need to sync across devices.
 //!
-//! 在 Warp 中云端同步链路(RTC / UpdateManager / SyncQueue / ServerApiProvider)
-//! 已被剥离(详见 `docs/warp-cloud-removal-plan.md`),本模块**变为纯本地对象抽象**:
+//! In Warp the cloud sync chain (RTC / UpdateManager / SyncQueue / ServerApiProvider)
+//! has been stripped (see `docs/warp-cloud-removal-plan.md`), so this module **is now a pure local object abstraction**:
 //!
-//! - `StoredObject` trait → 实际语义是 "本地领域对象 trait",承载 metadata / permissions /
-//!   versions / display_name / upsert_event / as_any / clone_box;命名上的 `Cloud` 前缀
-//!   仅为减少跨上游 cherry-pick 的 diff 面而保留,不再具有任何云端含义。
-//! - `GenericStoredObject<K, M>` → 本地领域对象的泛型承载结构。
-//! - `StoredObjectModel` trait → 本地对象类型描述。
-//! - `ObjectStoreModel`(`model/persistence.rs`)→ 进程内本地对象全局存储 + SQLite 背存。
-//! - `ObjectStoreEvent` → 本地模型变更事件总线,被本地 UI 视图订阅。
-//! - `ObjectTypeAndId` → 本地 ID 判别式,被 Drive UI / search 等 60+ 处使用。
+//! - `StoredObject` trait -> actually the "local domain object trait", carrying metadata / permissions /
+//!   versions / display_name / upsert_event / as_any / clone_box; the `Cloud` prefix in names
+//!   is kept only to reduce the diff surface for upstream cherry-picks and no longer has any cloud meaning.
+//! - `GenericStoredObject<K, M>` -> generic container for local domain objects.
+//! - `StoredObjectModel` trait -> local object type description.
+//! - `ObjectStoreModel` (`model/persistence.rs`) -> in-process global local object store backed by SQLite.
+//! - `ObjectStoreEvent` -> local model change event bus, subscribed by local UI views.
+//! - `ObjectTypeAndId` -> local ID discriminant, used in 60+ places such as Drive UI / search.
 //!
-//! 之所以采用 "保留原名 + 文档注释" 而非物理重命名(`StoredObject` → `LocalObject`),
-//! 是为了把重命名的 200+ 处级联改动留到上游同步策略稳定后再统一做,本阶段**只
-//! 标注语义已本地化**,不动符号名。
+//! We chose "keep the original names + doc comments" over a physical rename (`StoredObject` -> `LocalObject`)
+//! to defer the 200+ cascading changes of a rename until the upstream sync strategy is stable, so this phase **only
+//! marks the semantics as localized** and does not touch symbol names.
 //!
-//! 真正的 "服务端往返" 类型正在分批物理删除；服务端对象 enum、字段转换、
-//! 初始加载 fan-in 与旧服务端泛型对象承载结构已删除。
+//! The real "server round-trip" types are being physically deleted in batches; the server object enum, field conversion,
+//! initial-load fan-in and the old server generic object container have been deleted.
 
 use self::{breadcrumbs::ContainingObject, model::persistence::ObjectStoreModel};
 use crate::{
@@ -60,10 +60,10 @@ pub mod update_manager;
 
 pub use server_types::*;
 
-/// 包装一个 model 序列化后字符串的 newtype。
+/// Newtype wrapping a model's serialized string.
 ///
-/// Warp(Wave 4):原定义在 `crate::server::sync_queue`,SyncQueue 整删后
-/// 迁到这里。多个 model 的 `serialized()` 仍然返回它(本地写 sqlite 时使用)。
+/// Warp (Wave 4): originally defined in `crate::server::sync_queue`; moved here after SyncQueue was removed entirely.
+/// Several models' `serialized()` still return it (used when writing to sqlite locally).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SerializedModel(String);
 
@@ -117,8 +117,8 @@ impl From<&str> for SerializedModel {
 /// The typical usage pattern for these types is to use dyn StoredObject whenever you
 /// don't need access to a model or id, and to downcast to a GenericStoredObject whenever you do.
 ///
-/// 由于历史 cloud-object 命名仍保留,当前所有本地 StoredObject 都需要实现
-/// GenericStoredObject。
+/// Because the historical cloud-object naming is kept, every local StoredObject currently needs to implement
+/// GenericStoredObject.
 ///
 /// Additionally, they must support the "grab the baton" UX for editing, where any
 /// user can grab edit access of an object, revoking it from anyone else currently
@@ -434,14 +434,14 @@ pub trait StoredObject: Debug {
             .downcast_mut::<GenericStoredObject<K, M>>()
     }
 
-    /// 返回这个 stored object 的 boxed clone。
-    /// 不能直接要求 StoredObject trait derive Clone,否则 trait 不再 object safe。
+    /// Returns a boxed clone of this stored object.
+    /// StoredObject cannot require Clone directly, or the trait would no longer be object safe.
     fn clone_box(&self) -> Box<dyn StoredObject>;
 }
 
 /// Defines a common trait for object store models to implement.
-/// "model" 是 stored object 的领域数据,例如 notebook/workflow/folder 的具体内容;
-/// metadata、permissions、sync status 逻辑不放在这里。
+/// "model" is the domain data of a stored object, e.g. the concrete content of a notebook/workflow/folder;
+/// metadata, permissions and sync status logic do not belong here.
 ///
 /// See the comments for StoredObject to understand the relationship between
 /// this trait, StoredObject and GenericStoredObject.  They are tightly coupled.
@@ -536,9 +536,9 @@ lazy_static! {
         Regex::new(r"[^a-zA-Z0-9\s-]").expect("Expect regex to be valid");
 }
 
-/// GenericStoredObject 是历史 cloud-object 体系保留下来的本地对象通用实现。
+/// GenericStoredObject is the generic local object implementation kept from the historical cloud-object system.
 ///
-/// 新对象可以直接使用 GenericStoredObject<K, M>,其中 K 是 id type,M 是 model type。
+/// New objects can use GenericStoredObject<K, M> directly, where K is the id type and M is the model type.
 ///
 /// For example, NotebookObject becomes:
 ///

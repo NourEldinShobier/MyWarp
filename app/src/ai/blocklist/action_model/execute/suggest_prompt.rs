@@ -52,10 +52,10 @@ impl PromptSuggestionExecutor {
             return ActionExecution::InvalidAction;
         };
 
-        // Warp:无条件 emit(原版 gate 在 PromptSuggestionsViaMAA cargo feature 下,
-        // OSS 默认不开 → chip 永远不显示 → oneshot 永挂)。BYOP 场景模型主动调
-        // suggest_prompt 时,需要 view 层订阅本 event 把 chip 显示给用户,接受后
-        // 调 complete_suggest_prompt_action 关 channel。详见
+        // Warp: emit unconditionally (the original was gated behind the PromptSuggestionsViaMAA cargo feature,
+        // which OSS leaves off by default -> the chip never shows -> the oneshot hangs forever). In the BYOP scenario, when the model proactively calls
+        // suggest_prompt, the view layer must subscribe to this event to show the chip to the user, and after acceptance
+        // call complete_suggest_prompt_action to close the channel. See
         // app/src/terminal/view.rs::handle_prompt_suggestion_executor_event。
         if let SuggestPromptRequest::PromptSuggestion { prompt, label } = request {
             ctx.emit(PromptSuggestionExecutorEvent::NewPromptSuggestion {

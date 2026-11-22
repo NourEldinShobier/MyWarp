@@ -1,37 +1,37 @@
-//! 全局 HTTP 代理配置。
+//! Global HTTP proxy configuration.
 //!
-//! 见 Issue #72:Warp 需要一个全局可配置的代理设置,统一覆盖所有出站 HTTP
-//! 请求(BYOP 拉模型列表、autoupdate、对话加载等)。
+//! See Issue #72: Warp needs a globally configurable proxy setting that applies to all outbound HTTP
+//! requests (BYOP model list fetches, autoupdate, conversation loading, etc.).
 //!
-//! 设计要点:
-//! - 三档 [`ProxyMode`]:`System` / `Custom` / `Off`。
-//! - `System` 退回 reqwest 默认行为;workspace 的 reqwest 已启用
-//!   `system-proxy` + `macos-system-configuration` features,因此 macOS 读
-//!   SystemConfiguration、Windows 读 WinINET、Linux 读 `HTTP_PROXY` 等环境变量,
-//!   无需自己实现。
-//! - `Custom` 显式指定 URL / basic auth / no_proxy 列表。
-//! - `Off` 调用 [`reqwest::ClientBuilder::no_proxy`],完全禁用代理(含环境变量)。
+//! Design notes:
+//! - Three [`ProxyMode`] values: `System` / `Custom` / `Off`.
+//! - `System` falls back to the default reqwest behavior; the workspace reqwest enables the
+//!   `system-proxy` + `macos-system-configuration` features, so macOS reads
+//!   SystemConfiguration, Windows reads WinINET and Linux reads env vars such as `HTTP_PROXY`,
+//!   with no custom implementation needed.
+//! - `Custom` explicitly sets the URL / basic auth / no_proxy list.
+//! - `Off` calls [`reqwest::ClientBuilder::no_proxy`], disabling the proxy entirely (including env vars).
 //!
-//! 应用通过 [`set_global_proxy_config`] 在启动 / 设置变更时注入配置,
-//! 后续所有 [`crate::Client::new`] 调用会读取该全局值并应用到 reqwest。
+//! The app injects the config through [`set_global_proxy_config`] at startup / on settings change;
+//! every later [`crate::Client::new`] call reads that global value and applies it to reqwest.
 //!
-//! reqwest 不支持已构造 `Client` 的运行时代理切换,因此调用方在变更设置后必须
-//! 重建 Client 实例(例如 `AutoupdateState::new(http_client::Client::new())`)。
+//! reqwest cannot switch the proxy on an already-built `Client`, so after a settings change callers must
+//! rebuild the Client instance (e.g. `AutoupdateState::new(http_client::Client::new())`).
 
 use std::sync::{OnceLock, RwLock};
 
-/// 全局代理模式。
+/// Global proxy mode.
 ///
-/// 默认项为 `Off`:避免在 app 层 settings 还未注入之前,冷启动期间构造的
-/// `Client` 走上 reqwest 探测到的意外系统代理。app::ProxyMode 同一默认。
+/// Defaults to `Off`: avoids a `Client` built during cold start, before the app-level settings are
+/// injected, picking up an unexpected system proxy detected by reqwest. app::ProxyMode has the same default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ProxyMode {
-    /// 禁用代理,包括环境变量。默认项。
+    /// Disables the proxy, including env vars. The default.
     #[default]
     Off,
-    /// 完全跟随系统 / 环境变量(reqwest 默认行为)。
+    /// Follows the system / env vars entirely (default reqwest behavior).
     System,
-    /// 使用 [`ProxyConfig::url`] 中显式配置的代理。
+    /// Uses the proxy explicitly configured in [`ProxyConfig::url`].
     Custom,
 }
 
@@ -48,32 +48,32 @@ impl ProxyMode {
         match s.to_ascii_lowercase().as_str() {
             "system" => ProxyMode::System,
             "custom" => ProxyMode::Custom,
-            // off / disabled / none / 未知 都退回 Off(默认),避免意外走系统代理。
+            // off / disabled / none / unknown all fall back to Off (the default) to avoid accidentally using the system proxy.
             _ => ProxyMode::Off,
         }
     }
 }
 
-/// 已解析的全局代理配置。
+/// Resolved global proxy configuration.
 ///
-/// `username` 在 settings.toml 中明文存储,`password` 通过 `managed_secrets`
-/// 单独保存(与 BYOP API key 同模式),由调用方在装配本结构前注入到 [`Self::password`]。
+/// `username` is stored in plain text in settings.toml; `password` is saved separately through `managed_secrets`
+/// (same pattern as the BYOP API key), and the caller injects it into [`Self::password`] before assembling this struct.
 #[derive(Clone, Debug, Default)]
 pub struct ProxyConfig {
     pub mode: ProxyMode,
-    /// 例:`http://proxy.corp:8080`。仅在 [`ProxyMode::Custom`] 下生效。
+    /// Example: `http://proxy.corp:8080`. Only takes effect under [`ProxyMode::Custom`].
     pub url: String,
     pub username: String,
     pub password: String,
-    /// 逗号分隔的 host 列表;空字符串表示无例外。
+    /// Comma-separated host list; an empty string means no exceptions.
     pub no_proxy: String,
 }
 
 impl ProxyConfig {
-    /// 将本配置应用到 `reqwest::ClientBuilder`。
+    /// Applies this config to `reqwest::ClientBuilder`.
     ///
-    /// 出错时(`Custom` 模式但 URL 不合法)在日志中告警并退回 reqwest 默认行为,
-    /// 不让 `Client::new()` panic。
+    /// On error (`Custom` mode with an invalid URL) logs a warning and falls back to the default reqwest
+    /// behavior so `Client::new()` never panics.
     pub fn apply(&self, mut builder: reqwest::ClientBuilder) -> reqwest::ClientBuilder {
         match self.mode {
             ProxyMode::System => builder,
@@ -81,7 +81,7 @@ impl ProxyConfig {
             ProxyMode::Custom => {
                 let trimmed = self.url.trim();
                 if trimmed.is_empty() {
-                    log::warn!("HTTP 代理设置为 Custom 但 URL 为空,退回 reqwest 默认(读系统代理)");
+                    log::warn!("HTTP proxy is set to Custom but the URL is empty; falling back to reqwest default (system proxy)");
                     return builder;
                 }
 
@@ -89,7 +89,7 @@ impl ProxyConfig {
                 let mut proxy = match proxy_result {
                     Ok(p) => p,
                     Err(err) => {
-                        log::warn!("HTTP 代理 URL '{trimmed}' 无效({err}),退回 reqwest 默认");
+                        log::warn!("HTTP proxy URL '{trimmed}' is invalid ({err}); falling back to reqwest default");
                         return builder;
                     }
                 };
@@ -117,26 +117,26 @@ fn slot() -> &'static RwLock<ProxyConfig> {
     GLOBAL_PROXY_CONFIG.get_or_init(|| RwLock::new(ProxyConfig::default()))
 }
 
-/// 安装新的全局代理配置。
+/// Installs a new global proxy config.
 ///
-/// 仅影响该调用之后构造的 `Client`。`reqwest::Client` 一旦构造完成无法切换
-/// 代理,因此应用层在变更设置后需要重建所有共享的 Client 实例。
+/// Only affects `Client`s constructed after this call. A constructed `reqwest::Client` cannot switch
+/// its proxy, so after a settings change the app layer must rebuild all shared Client instances.
 pub fn set_global_proxy_config(cfg: ProxyConfig) {
     let lock = slot();
     if let Ok(mut guard) = lock.write() {
         *guard = cfg;
     } else {
-        log::error!("写入全局 HTTP 代理配置失败:RwLock 已 poison");
+        log::error!("Failed to write global HTTP proxy config: RwLock is poisoned");
     }
 }
 
-/// 读取当前的全局代理配置(若未设置则返回默认值)。
+/// Reads the current global proxy config (returns the default if unset).
 pub fn current_proxy_config() -> ProxyConfig {
     let lock = slot();
     match lock.read() {
         Ok(guard) => guard.clone(),
         Err(err) => {
-            log::error!("读取全局 HTTP 代理配置失败:RwLock 已 poison({err})");
+            log::error!("Failed to read global HTTP proxy config: RwLock is poisoned ({err})");
             ProxyConfig::default()
         }
     }

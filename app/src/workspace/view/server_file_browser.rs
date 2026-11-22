@@ -400,9 +400,9 @@ impl ServerFileBrowserView {
             || self.current_path != path
             || session_changed
             || session_id_changed;
-        // host 或 session 切换时,旧的进度轮询已与新连接无关,先停掉避免
-        // 多余的 timer 回调。若后续加载中产生新的 upload/download 任务,
-        // `schedule_progress_poll` 会被重新启动。
+        // When the host or session switches, the old progress polling no longer relates to the new connection; stop it first to avoid
+        // redundant timer callbacks. If new upload/download tasks are created during later loading,
+        // `schedule_progress_poll` will be restarted.
         if host_changed || session_changed || session_id_changed {
             self.stop_progress_poll();
         }
@@ -3611,11 +3611,11 @@ async fn list_directory(
             let canonical_path = success.canonical_path;
             let mut entries = Vec::with_capacity(success.entries.len());
             for entry in success.entries {
-                // 兼容旧版服务端:`kind` 字段是新协议引入的,旧 server 返回的
-                // `FileSystemEntryKind::Unspecified` 不能直接降级为 `Other`,
-                // 否则双击目录会误走 ResolvePath(旧 server 不支持) 流程并报错。
-                // 这里在 `Unspecified` 时回退到旧字段 `is_dir`;未知 kind(未来 server
-                // 可能新增的变体)则归为 `Other`,避免根据 `is_dir` 猜测导致误判。
+                // Compatibility with older servers: the `kind` field was introduced by the new protocol, and the
+                // `FileSystemEntryKind::Unspecified` returned by old servers must not be downgraded directly to `Other`,
+                // otherwise double-clicking a directory would wrongly take the ResolvePath flow (unsupported by old servers) and error.
+                // Here, on `Unspecified`, fall back to the old `is_dir` field; unknown kinds (variants
+                // that future servers may add) map to `Other`, to avoid misjudging by guessing from `is_dir`.
                 let kind = match FileSystemEntryKind::try_from(entry.kind) {
                     Ok(FileSystemEntryKind::Unspecified) => {
                         if entry.is_dir {

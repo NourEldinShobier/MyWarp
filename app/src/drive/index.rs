@@ -941,9 +941,10 @@ impl DriveIndex {
         app: &AppContext,
     ) -> bool {
         if let Some(object) = ObjectStoreModel::as_ref(app).get_by_uid(&object_type_and_id.uid()) {
-            // Warp(去中心化分支):本地对象(无 server_id,SyncQueue 上行无 auth no-op)
-            // 在原逻辑下永远拿不到 trash/move 菜单。这里把"无 server_id"视为本地对象,
-            // 允许其执行本地侧操作(trash 走 sqlite,无需服务器协调)。
+            // Warp (decentralized branch): a local object (no server_id; the SyncQueue upload is an
+            // auth no-op) would never get a trash/move menu under the original logic. Treat
+            // "no server_id" as a local object and allow local-side operations
+            // (trash goes through sqlite, no server coordination needed).
             if !object_type_and_id.has_server_id() {
                 return !object.metadata().has_pending_online_only_change();
             }
@@ -2340,7 +2341,7 @@ impl DriveIndex {
             share_dialog_open,
             is_selected,
             is_focused,
-            false, /* Warp(Wave 4):SyncQueue 整删,is_dequeueing 永远 false */
+            false, /* Warp (Wave 4): SyncQueue fully removed, is_dequeueing is always false */
             tools_panel_menu_direction(app),
             appearance,
         )?;
@@ -3375,8 +3376,9 @@ impl DriveIndex {
     }
 
     fn retry_all_failed(&mut self, ctx: &mut ViewContext<Self>) {
-        // Warp(Wave 4):SyncQueue 整删后,“重试”原语义(重新上报服务端)
-        // 不再适用;本地化后对象不会进入 errored 态,这个路径是 dead code。
+        // Warp (Wave 4): with the SyncQueue fully removed, the original "retry" semantics
+        // (re-report to the server) no longer apply; after localization objects never enter
+        // the errored state, so this path is dead code.
         let _ = ctx;
     }
 
@@ -3757,9 +3759,10 @@ impl DriveIndex {
         let object = ObjectStoreModel::as_ref(app).get_by_uid(&object_type_and_id.uid());
 
         if let ObjectTypeAndId::Folder(folder_id) = object_type_and_id {
-            // Warp:本地 folder(ClientId,SyncQueue 上行无 auth no-op)永远拿不到 server_id,
-            // 原 `SyncId::ServerId(_) && is_online` 双重门槛会让本地文件夹永远没有"新建子项/Rename"右键菜单。
-            // 这里把"本地 folder"视为永远 ready。
+            // Warp: a local folder (ClientId; the SyncQueue upload is an auth no-op) never gets a server_id,
+            // so the original `SyncId::ServerId(_) && is_online` double gate would leave local folders
+            // without the "New child / Rename" context menu.
+            // Treat a "local folder" as always ready.
             let is_local_folder = matches!(folder_id, SyncId::ClientId(_));
             let server_folder_ready =
                 matches!(folder_id, SyncId::ServerId(_)) && self.is_online(app);
@@ -3851,9 +3854,9 @@ impl DriveIndex {
                                 .with_icon(Icon::Link)
                                 .into_item(),
                         );
-                        // TODO(warp-cloud-removal Phase 5): `editability` 在此处只剩
-                        // 用于决定 share 菜单可见性。share 菜单已删,但 editability 仍是
-                        // StoredObject 权限模型的一部分,保留以待 cloud_object 整体退役。
+                        // TODO(warp-cloud-removal Phase 5): `editability` is now only used here
+                        // to decide share-menu visibility. The share menu is gone, but editability is
+                        // still part of the StoredObject permission model; keep it until cloud_object is retired as a whole.
                         let _ = editability;
                     }
                 }
@@ -3879,7 +3882,7 @@ impl DriveIndex {
                 );
 
                 if let Some(object) = object {
-                    // Warp(Wave 6-7):“Leave shared object” 菜单随 `leave_object` pub fn 退役。
+                    // Warp (Wave 6-7): the "Leave shared object" menu is retired along with the `leave_object` pub fn.
                     let _ = object;
                 }
             }
@@ -4117,7 +4120,7 @@ impl DriveIndex {
                 }
 
                 if FeatureFlag::SharedWithMe.is_enabled() && object.can_leave(app) {
-                    // Warp(Wave 6-7):“Leave shared object” 菜单随 `leave_object` pub fn 退役。
+                    // Warp (Wave 6-7): the "Leave shared object" menu is retired along with the `leave_object` pub fn.
                 }
             }
         }

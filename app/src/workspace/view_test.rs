@@ -65,7 +65,7 @@ use crate::workflows::local_workflows::LocalWorkflows;
 use crate::ObjectActions;
 use crate::{experiments, workspace, GlobalResourceHandlesProvider};
 
-// Warp(本地化,Phase 5):`PreferencesSyncer` 已物理删除。
+// Warp (localization, Phase 5): `PreferencesSyncer` was physically deleted.
 
 use crate::terminal::shared_session::protocol::SessionId;
 use ai::project_context::model::ProjectContextModel;
@@ -110,7 +110,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(NotebookKeybindings::new);
     app.add_singleton_model(TerminalKeybindings::new);
     app.add_singleton_model(NotebookManager::mock);
-    // Warp(本地化,Phase 5):`PreferencesSyncer` 已物理删除,test singleton 不再需要。
+    // Warp (localization, Phase 5): `PreferencesSyncer` was physically deleted; the test singleton is no longer needed.
     app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
     app.add_singleton_model(|_| CLIAgentSessionsModel::new());
     app.add_singleton_model(AgentConversationsModel::new);
@@ -130,7 +130,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|ctx| {
         AIExecutionProfilesModel::new(&crate::LaunchMode::new_for_unit_test(), ctx)
     });
-    // Warp:RepoOutlines 已删除,不再注册。
+    // Warp: RepoOutlines was deleted and is no longer registered.
     #[cfg(feature = "voice_input")]
     app.add_singleton_model(voice_input::VoiceInput::new);
     app.add_singleton_model(BlocklistAIPermissions::new);
@@ -273,30 +273,30 @@ fn open_worktree_sidecar(workspace: &ViewHandle<Workspace>, app: &mut App) {
 
 #[cfg(feature = "local_fs")]
 #[test]
-#[ignore = "依赖已下线的 PersistedWorkspace"]
+#[ignore = "depends on the retired PersistedWorkspace"]
 fn test_worktree_sidecar_hover_takes_precedence_over_selection() {
-    unimplemented!("PersistedWorkspace 已下线,worktree sidecar 仓库列表测试暂停");
+    unimplemented!("PersistedWorkspace was retired; worktree sidecar repo-list test suspended");
 }
 
 #[cfg(feature = "local_fs")]
 #[test]
-#[ignore = "依赖已下线的 PersistedWorkspace"]
+#[ignore = "depends on the retired PersistedWorkspace"]
 fn test_worktree_sidecar_pointer_entry_does_not_select_top_repo() {
-    unimplemented!("PersistedWorkspace 已下线,worktree sidecar 仓库列表测试暂停");
+    unimplemented!("PersistedWorkspace was retired; worktree sidecar repo-list test suspended");
 }
 
 #[cfg(feature = "local_fs")]
 #[test]
-#[ignore = "依赖已下线的 PersistedWorkspace"]
+#[ignore = "depends on the retired PersistedWorkspace"]
 fn test_worktree_sidecar_close_via_select_item_executes_from_workspace() {
-    unimplemented!("PersistedWorkspace 已下线,worktree sidecar 仓库列表测试暂停");
+    unimplemented!("PersistedWorkspace was retired; worktree sidecar repo-list test suspended");
 }
 
 #[cfg(feature = "local_fs")]
 #[test]
-#[ignore = "依赖已下线的 PersistedWorkspace"]
+#[ignore = "depends on the retired PersistedWorkspace"]
 fn test_worktree_sidecar_search_editor_enter_executes_selection() {
-    unimplemented!("PersistedWorkspace 已下线,worktree sidecar 仓库列表测试暂停");
+    unimplemented!("PersistedWorkspace was retired; worktree sidecar repo-list test suspended");
 }
 
 /// RAII guard that removes tab config TOML files whose name starts with
@@ -2333,16 +2333,16 @@ fn test_unified_new_session_menu_includes_reopen_closed_session() {
 
 #[cfg(feature = "local_fs")]
 #[test]
-#[ignore = "依赖已下线的 PersistedWorkspace"]
+#[ignore = "depends on the retired PersistedWorkspace"]
 fn test_worktree_sidecar_search_editor_proxies_navigation_and_escape() {
-    unimplemented!("PersistedWorkspace 已下线,worktree sidecar 仓库列表测试暂停");
+    unimplemented!("PersistedWorkspace was retired; worktree sidecar repo-list test suspended");
 }
 
 #[cfg(feature = "local_fs")]
 #[test]
-#[ignore = "依赖已下线的 PersistedWorkspace"]
+#[ignore = "depends on the retired PersistedWorkspace"]
 fn test_worktree_sidecar_hides_linked_worktrees_from_repo_list() {
-    unimplemented!("PersistedWorkspace 已下线,worktree sidecar 仓库列表测试暂停");
+    unimplemented!("PersistedWorkspace was retired; worktree sidecar repo-list test suspended");
 }
 
 #[test]
@@ -2398,5 +2398,5 @@ fn test_standard_tab_context_menu_shows_hover_only_tab_bar() {
     });
 }
 
-// 已删:test_open_ambient_agent_setup_guide_action_opens_management_view_and_is_idempotent
-// agent_management_view 字段连同 agent setup guide 整片功能在 Phase 2c 已删。
+// Deleted: test_open_ambient_agent_setup_guide_action_opens_management_view_and_is_idempotent
+// The agent_management_view field and the whole agent setup guide feature were deleted in Phase 2c.

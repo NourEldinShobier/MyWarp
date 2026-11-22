@@ -103,8 +103,8 @@ impl Requests {
             request_limit_info,
         };
 
-        // Warp:无 Warp Inc 云后端,初始 request_limit_info 不再向服务端拉取;
-        // 使用上面 cached / default 的值即可。
+        // Warp: there is no Warp Inc cloud backend, so the initial request_limit_info is no longer fetched from the server;
+        // the cached / default value above is enough.
         let _ = cached_request_limit_info;
         requests
     }

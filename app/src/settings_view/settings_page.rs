@@ -100,18 +100,18 @@ pub enum SettingsPageViewHandle {
     Keybindings(ViewHandle<KeybindingsView>),
     About(ViewHandle<AboutPageView>),
     Code(ViewHandle<CodeSettingsPageView>),
-    // Warp Wave 3-1:`OzCloudAPIKeys` variant 随 `platform_page` 一同物理删。
-    // 云端 API key 管理 UI 完全代表 Warp Inc 云端账号,与 BYOP 无关。
-    // Warp Wave 6-8:`SharedBlocks` / `Referrals` variant 随 `ShowBlocksView` /
-    // `ReferralsPageView` 与对应 ServerApi client trait 物理删。
-    // Warp Wave 7-3:`CloudEnvironments` variant 随 ambient-agent UI 子系统物理删。
+    // Warp Wave 3-1: the `OzCloudAPIKeys` variant was physically deleted along with `platform_page`.
+    // The cloud API key management UI belonged entirely to Warp Inc's cloud accounts and is unrelated to BYOP.
+    // Warp Wave 6-8: the `SharedBlocks` / `Referrals` variants were physically deleted along with `ShowBlocksView` /
+    // `ReferralsPageView` and the corresponding ServerApi client trait.
+    // Warp Wave 7-3: the `CloudEnvironments` variant was physically deleted along with the ambient-agent UI subsystem.
     Warpify(ViewHandle<WarpifyPageView>),
     AI(ViewHandle<AISettingsPageView>),
     MCPServers(ViewHandle<MCPServersSettingsPageView>),
     WarpDrive(ViewHandle<WarpDriveSettingsPageView>),
-    /// 全局 HTTP 代理设置页。
+    /// Global HTTP proxy settings page.
     Network(ViewHandle<NetworkPageView>),
-    /// 云同步设置页。
+    /// Cloud sync settings page.
     CloudSync(ViewHandle<CloudSyncPageView>),
 }
 
@@ -124,9 +124,9 @@ impl SettingsPageViewHandle {
             Keybindings(view_handle) => ChildView::new(view_handle).finish(),
             About(view_handle) => ChildView::new(view_handle).finish(),
             Code(view_handle) => ChildView::new(view_handle).finish(),
-            // Warp Wave 3-1:`OzCloudAPIKeys` arm 随 `platform_page` 一同物理删。
-            // Warp Wave 6-8:`SharedBlocks` / `Referrals` arm 随 variant 物理删。
-            // Warp Wave 7-3:`CloudEnvironments` arm 随 ambient-agent UI 一同物理删。
+            // Warp Wave 3-1: the `OzCloudAPIKeys` arm was physically deleted along with `platform_page`.
+            // Warp Wave 6-8: the `SharedBlocks` / `Referrals` arms were physically deleted along with their variants.
+            // Warp Wave 7-3: the `CloudEnvironments` arm was physically deleted along with the ambient-agent UI.
             Warpify(view_handle) => ChildView::new(view_handle).finish(),
             AI(view_handle) => ChildView::new(view_handle).finish(),
             MCPServers(view_handle) => ChildView::new(view_handle).finish(),
@@ -194,7 +194,7 @@ pub enum SettingsPageEvent {
     FocusModal,
     Pane(PaneEventWrapper),
     // Warp Wave 7-3:`EnvironmentSetupModeSelectorToggled` /
-    // `AgentAssistedEnvironmentModalToggled` 随 ambient-agent UI 子系统物理删。
+    // `AgentAssistedEnvironmentModalToggled` was physically deleted along with the ambient-agent UI subsystem.
 }
 
 /// Wrapper for pane events to avoid circular dependency with pane module.
@@ -1326,8 +1326,8 @@ impl<V: warpui::View> PageType<V> {
         }
     }
 
-    /// 取出当前 page 的滚动状态 handle(垂直、水平),用于 rebuild 时跨实例保留滚动位置。
-    /// `Monolith` 的 scroll state 是可选的,这里只在两个非空 handle 都存在时返回。
+    /// Takes the current page's scroll state handles (vertical, horizontal), used to preserve scroll position across instances on rebuild.
+    /// `Monolith`'s scroll state is optional, so this only returns when both handles are present.
     pub(super) fn scroll_states(
         &self,
     ) -> Option<(ClippedScrollStateHandle, ClippedScrollStateHandle)> {
@@ -1354,7 +1354,7 @@ impl<V: warpui::View> PageType<V> {
         }
     }
 
-    /// 用旧 page 的 scroll handle 替换当前 page 的内部 handle,保留滚动位置。
+    /// Replaces the current page's internal handles with the old page's scroll handles, preserving scroll position.
     pub(super) fn replace_scroll_states(
         &mut self,
         v: ClippedScrollStateHandle,

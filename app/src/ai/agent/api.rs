@@ -89,12 +89,12 @@ pub struct RequestParams {
     pub cli_agent_model: LLMId,
     pub computer_use_model: LLMId,
     pub is_memory_enabled: bool,
-    /// Warp BYOP 专用:用户在 设置 → Agents → Rules 创建的全局 Rules
-    /// (`AIFact::Memory`)的快照,在 `new()` 中从 `ObjectStoreModel` 一次性拉取
-    /// 后随请求 plumb 到 `chat_stream::build_chat_request` → `prompt_renderer`,
-    /// 由 `partials/user_rules.j2` 渲染进 system prompt。
-    /// 仅在 `is_memory_enabled` 为 true 且未被 trash 时收集;为了 prompt cache
-    /// 稳定性,按 `(name, content)` 字典序排序。
+    /// Warp BYOP only: snapshot of the global Rules (`AIFact::Memory`) the user created under Settings -> Agents -> Rules,
+    /// fetched once from `ObjectStoreModel` in `new()`,
+    /// then plumbed with the request to `chat_stream::build_chat_request` -> `prompt_renderer`,
+    /// and rendered into the system prompt by `partials/user_rules.j2`.
+    /// Collected only when `is_memory_enabled` is true and the rule is not trashed; sorted lexicographically by `(name, content)`
+    /// to keep the prompt cache stable.
     pub user_rules: Vec<(Option<String>, String)>,
     pub warp_drive_context_enabled: bool,
     pub context_window_limit: Option<u32>,
@@ -112,49 +112,49 @@ pub struct RequestParams {
     pub ask_user_question_enabled: bool,
     pub research_agent_enabled: bool,
     pub supported_tools_override: Option<Vec<warp_multi_agent_api::ToolType>>,
-    /// Warp BYOP 专用:本地会话 id,只用于 request-readiness 诊断日志。
+    /// Warp BYOP only: local session id, used only for request-readiness diagnostic logs.
     pub byop_conversation_id: Option<AIConversationId>,
-    /// Warp BYOP 专用:单次请求内的非持久诊断关联 id。
+    /// Warp BYOP only: non-persistent diagnostic correlation id within a single request.
     pub byop_readiness_attempt_id: Option<String>,
     /// The conversation ID of the parent agent that spawned this child agent, if any.
     pub parent_agent_id: Option<String>,
     /// The display name for this agent (e.g. "Agent 1"), assigned by the orchestrator.
     pub agent_name: Option<String>,
-    /// Warp BYOP 专用:发起本请求时,关联的 LRC(Long Running Command)block id。
-    /// tag-in 首轮和已进入 agent control 的 CLI subagent 后续轮都会填充,用于
-    /// 让 BYOP prompt / tools 继续绑定到当前 PTY,避免模型另起 shell 操作同一个 TUI。
+    /// Warp BYOP only: the associated LRC (Long Running Command) block id when this request is made.
+    /// Populated for the first tag-in turn and for later turns of a CLI subagent already under agent control, so that
+    /// BYOP prompts / tools stay bound to the current PTY and the model does not start another shell to operate the same TUI.
     pub lrc_command_id: Option<String>,
-    /// Warp BYOP 专用:LRC 当前快照。`UserQuery.running_command` 只覆盖用户输入轮,
-    /// auto-resume / tool result 后续轮需要通过这里继续携带最新 PTY 内容。
+    /// Warp BYOP only: current LRC snapshot. `UserQuery.running_command` only covers user-input turns;
+    /// auto-resume / post-tool-result turns need this field to keep carrying the latest PTY content.
     pub lrc_running_command: Option<RunningCommand>,
-    /// Warp BYOP 本地会话压缩 sidecar 快照(controller 把 conversation.compaction_state.clone() 塞进来)。
-    /// `chat_stream::build_chat_request` 据此:
-    ///   1. 过滤 [`crate::ai::byop_compaction::state::CompactionState::hidden_message_ids`] 里的 messages
-    ///   2. 在被隐去区间的位置插入"摘要 user/assistant 对"
-    ///   3. 把 `tool_output_compacted_at` 不为空的 ToolCallResult 替换为占位符
-    ///   4. 在 `AIAgentInput::SummarizeConversation` 路径切 head + 拼 SUMMARY_TEMPLATE 作 user message
+    /// Warp BYOP local-session compaction sidecar snapshot (the controller stuffs in conversation.compaction_state.clone()).
+    /// `chat_stream::build_chat_request` uses it to:
+    ///   1. filter out messages in [`crate::ai::byop_compaction::state::CompactionState::hidden_message_ids`]
+    ///   2. insert a "summary user/assistant pair" where the hidden range was
+    ///   3. replace any ToolCallResult with a non-empty `tool_output_compacted_at` by a placeholder
+    ///   4. on the `AIAgentInput::SummarizeConversation` path, cut the head and append SUMMARY_TEMPLATE as the user message
     ///
-    /// 默认 `None` = 兼容路径(无压缩)。
+    /// Defaults to `None` = compatibility path (no compaction).
     pub compaction_state: Option<crate::ai::byop_compaction::state::CompactionState>,
-    /// Warp BYOP repair sidecar 快照。serializer 只读使用,不在请求构造中反序列化持久化 JSON。
+    /// Warp BYOP repair sidecar snapshot. Read-only for the serializer; persisted JSON is not deserialized during request construction.
     pub byop_repair_state: crate::ai::byop_readiness::RepairStateStatus,
-    /// Warp BYOP 专用:本轮是否需要模拟上游 CreateTask 流程来升级 optimistic CLI subtask。
-    /// 只有用户刚 tag-in 的首轮需要;已存在 CLI subagent 的后续轮只复用 task,不能重复 spawn。
+    /// Warp BYOP only: whether this turn must simulate the upstream CreateTask flow to upgrade the optimistic CLI subtask.
+    /// Only needed on the first turn right after the user tags in; later turns of an existing CLI subagent only reuse the task and must not spawn again.
     pub lrc_should_spawn_subagent: bool,
-    /// Warp BYOP 专用:本轮响应应该写入的 task。普通对话是 root task;
-    /// CLI subagent 后续轮则是对应 subtask。
+    /// Warp BYOP only: the task this turn's response should be written to. For normal conversations it is the root task;
+    /// for later turns of a CLI subagent it is the matching subtask.
     pub byop_target_task_id: Option<String>,
 }
 
-/// 收集用户在 设置 → Agents → Rules 创建的全局 Rules(`AIFact::Memory`)快照,
-/// 用于注入 BYOP system prompt(Issue #116)。
+/// Collects a snapshot of the global Rules (`AIFact::Memory`) the user created under Settings -> Agents -> Rules,
+/// for injection into the BYOP system prompt (Issue #116).
 ///
-/// - 过滤 trashed 条目
-/// - 按 `(name, content)` 字典序排序,避免 HashMap 迭代导致的请求间顺序漂移
-///   (否则会击穿上游 Anthropic / OpenAI 的 prompt cache)
+/// - filters out trashed entries
+/// - sorts lexicographically by `(name, content)` to avoid request-to-request order drift from HashMap iteration
+///   (which would otherwise bust the upstream Anthropic / OpenAI prompt cache)
 ///
-/// 不在内部判断 `is_memory_enabled`,gate 由调用方控制;这样函数可作为纯
-/// 集合逻辑独立测试,不依赖 `AISettings` 等 singleton。
+/// Does not check `is_memory_enabled` internally; the caller controls the gate. This way the function is pure
+/// collection logic that can be tested on its own, without singletons such as `AISettings`.
 pub(crate) fn collect_user_rules(
     object_store_model: &ObjectStoreModel,
 ) -> Vec<(Option<String>, String)> {
@@ -250,9 +250,9 @@ impl RequestParams {
         let is_memory_enabled = ai_settings.is_memory_enabled(app);
         let warp_drive_context_enabled = ai_settings.is_warp_drive_context_enabled(app);
 
-        // Warp BYOP 修复 Issue #116:gate 在 `is_memory_enabled`,具体收集逻辑
-        // 抽到 `collect_user_rules` 纯函数,只接 `&ObjectStoreModel` 入参以便测试,
-        // 不依赖完整 AppContext singleton 集合。
+        // Warp BYOP fix for Issue #116: gate on `is_memory_enabled`; the actual collection logic
+        // lives in the pure function `collect_user_rules`, which takes only `&ObjectStoreModel` so it can be tested
+        // without the full AppContext singleton set.
         let user_rules = if is_memory_enabled {
             collect_user_rules(ObjectStoreModel::as_ref(app))
         } else {
@@ -439,8 +439,8 @@ impl RequestParams {
             lrc_running_command: None,
             lrc_should_spawn_subagent: false,
             byop_target_task_id,
-            // BYOP-only:由 controller 在 dispatch 到 BYOP exec 前回填(setter 风格,
-            // 避免穿过 ConversationRequestData / 非 BYOP 路径)。
+            // BYOP-only: backfilled by the controller before dispatch to BYOP exec (setter style,
+            // avoids threading it through ConversationRequestData / non-BYOP paths).
             compaction_state: None,
             byop_repair_state: Default::default(),
         }

@@ -1,12 +1,12 @@
-//! 用户界面语言设置(persisted via settings.toml,启动时应用到 i18n loader)。
+//! User interface language setting (persisted via settings.toml, applied to the i18n loader at startup).
 //!
-//! 当前支持英文、简体中文、日语与俄语。新增语言只需:
-//!   1. `Language` 加 variant
-//!   2. `app/i18n/<locale>/warp.ftl` 新建翻译文件
-//!   3. `Display` + `to_locale_str` 加 case
+//! Currently supports English only. Adding a language only requires:
+//!   1. Add a variant to `Language`
+//!   2. Create a translation file at `app/i18n/<locale>/warp.ftl`
+//!   3. Add a case to `Display` + `to_locale_str`
 //!
-//! 切换在重启后完全生效(已渲染 UI 文本不会自动重排,需要 view 重建)。
-//! 设置页 dropdown 应附"重启 Warp 后完全生效"提示。
+//! A change takes full effect after a restart (already rendered UI text is not re-laid out automatically; views must be rebuilt).
+//! The settings page dropdown should carry a "takes full effect after restarting Warp" hint.
 
 use enum_iterator::Sequence;
 use serde::{Deserialize, Serialize};
@@ -31,18 +31,12 @@ use warp_core::settings::{macros::define_settings_group, SupportedPlatforms, Syn
     rename_all = "snake_case"
 )]
 pub enum Language {
-    /// 跟随系统语言;若系统 locale 非已支持语言,fallback 到英文。
+    /// Follow the system language; if the system locale is not a supported language, fall back to English.
     #[default]
     #[schemars(description = "System default")]
     System,
     #[schemars(description = "English")]
     English,
-    #[schemars(description = "Simplified Chinese")]
-    SimplifiedChinese,
-    #[schemars(description = "Japanese")]
-    Japanese,
-    #[schemars(description = "Russian")]
-    Russian,
 }
 
 impl std::fmt::Display for Language {
@@ -50,23 +44,17 @@ impl std::fmt::Display for Language {
         let value = match self {
             Language::System => "System default",
             Language::English => "English",
-            Language::SimplifiedChinese => "简体中文",
-            Language::Japanese => "日本語",
-            Language::Russian => "Русский",
         };
         write!(f, "{value}")
     }
 }
 
 impl Language {
-    /// 转 BCP-47 locale 字符串,`System` 返回 `None` 表示走系统检测。
+    /// Converts to a BCP-47 locale string; `System` returns `None`, meaning use system detection.
     pub fn to_locale_str(self) -> Option<&'static str> {
         match self {
             Language::System => None,
             Language::English => Some("en"),
-            Language::SimplifiedChinese => Some("zh-CN"),
-            Language::Japanese => Some("ja"),
-            Language::Russian => Some("ru"),
         }
     }
 }

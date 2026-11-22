@@ -1,16 +1,16 @@
-//! SSH 管理器主 panel — 左侧 Tool Panel 内容:树形列表 + 工具条 + 右键菜单
-//! + 文件夹内联重命名。
+//! SSH manager main panel: left Tool Panel content: tree list + toolbar + context menu
+//! + inline folder rename.
 //!
-//! UX 规则:
-//! - **单击 server**:直接连接(打开 terminal pane 跑 ssh)。要编辑用右键。
-//! - **单击 folder**:仅选中(高亮);编辑名走右键 "重命名" 或新建后立刻输入。
-//! - **新建文件夹后立即进入重命名态**(Drive 风格)。
-//! - 右键 server:编辑 / 连接 / 删除
-//! - 右键 folder:新建文件夹 / 新建服务器 / 重命名 / 删除
-//! - 右键空白:新建文件夹 / 新建服务器
+//! UX rules:
+//! - **Click a server**: connect directly (opens a terminal pane running ssh). Use the context menu to edit.
+//! - **Click a folder**: select only (highlight); rename via the context menu "Rename" or by typing right after creation.
+//! - **After creating a folder, enter rename mode immediately** (Drive style).
+//! - Right-click server: Edit / Connect / Delete
+//! - Right-click folder: New folder / New server / Rename / Delete
+//! - Right-click empty space: New folder / New server
 //!
-//! 视觉打磨参考 `app/src/drive/index.rs` 的常量(ITEM_FONT_SIZE=14 / 缩进 16 /
-//! 行 padding 4×8)。
+//! Visual polish follows the constants in `app/src/drive/index.rs` (ITEM_FONT_SIZE=14 / indent 16 /
+//! row padding 4×8).
 
 use std::collections::HashMap;
 
@@ -45,7 +45,7 @@ use crate::settings::SshSettings;
 use crate::ssh_manager::candidates::{CandidateRow, CandidatesViewModel};
 use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
 
-// ---- 视觉常量(参考 Drive) ----
+// ---- Visual constants (see Drive) ----
 const TOOLBAR_BUTTON_SIZE: f32 = 26.0;
 const TOOLBAR_ICON_SIZE: f32 = 14.0;
 const ITEM_PADDING_VERTICAL: f32 = 5.0;
@@ -64,18 +64,18 @@ const SSH_PANEL_POSITION_ID: &str = "ssh_manager_panel_root";
 
 #[derive(Clone, Debug)]
 pub enum SshManagerPanelAction {
-    /// 工具栏按钮：始终在根级创建文件夹。
+    /// Toolbar button: always creates the folder at root level.
     AddRootFolder,
-    /// 右键菜单：根据上下文决定父级。
+    /// Context menu: the parent is decided by context.
     AddFolder,
     AddServer,
     DeleteSelected,
     Connect,
     Edit,
     CloneServer(String),
-    /// 单击行,处理逻辑根据 node 种类:
-    /// - server: 选中 + emit OpenSshTerminal(直接连接)
-    /// - folder: 仅选中
+    /// Click a row; handling depends on the node kind:
+    /// - server: select + emit OpenSshTerminal (connect directly)
+    /// - folder: select only
     Click(String),
     StartRename(String),
     CommitRename,
@@ -85,43 +85,43 @@ pub enum SshManagerPanelAction {
         position: Vector2F,
     },
     DismissContextMenu,
-    /// 拖拽完成 → 把 `node_id` 移到 `new_parent_id` 下(None = root)。
+    /// Drag finished: move `node_id` under `new_parent_id` (None = root).
     MoveNode {
         node_id: String,
         new_parent_id: Option<String>,
     },
-    /// 折叠/展开单个 folder。Server 节点忽略。
+    /// Collapse/expand a single folder. Ignored for server nodes.
     ToggleNodeCollapsed(String),
-    /// 顶部按钮:智能切换 — 任何 folder 还展开 → 全收;否则全展。
+    /// Top button: smart toggle. If any folder is still expanded, collapse all; otherwise expand all.
     ToggleAllFolders,
-    /// 双击 server 行 = 连接(开新 tab)。Folder 双击 = 两次 toggle 抵消 no-op。
+    /// Double-click a server row = connect (open a new tab). Double-clicking a folder = two toggles that cancel out (no-op).
     DoubleClick(String),
-    /// 右键 server → "文件管理":打开 SFTP 文件浏览器 pane。
+    /// Right-click server -> "File manager": open the SFTP file browser pane.
     OpenSftp,
-    /// "Candidates" 区段:把 `~/.ssh/config` 的一条候选拷贝进保存树。
+    /// "Candidates" section: copy one candidate from `~/.ssh/config` into the saved tree.
     ImportCandidate {
         alias: String,
     },
-    /// 重新读 `~/.ssh/config`(用户改完 config 后点 Refresh 按钮)。
+    /// Re-read `~/.ssh/config` (the Refresh button, after the user edits the config).
     RefreshCandidates,
-    /// 折叠/展开 "Candidates" 区段(列表长时手动收起)。
+    /// Collapse/expand the "Candidates" section (manual collapse for long lists).
     ToggleCandidatesSection,
 }
 
 #[derive(Clone, Debug)]
 pub enum SshManagerPanelEvent {
-    /// 用户右键 "编辑" 选了个 server,中央 pane 应打开/聚焦该 server 的编辑
-    /// (`Workspace::open_ssh_server`)。
+    /// The user picked "Edit" on a server from the context menu; the central pane should open/focus that server's editor
+    /// (`Workspace::open_ssh_server`).
     OpenServerEditor {
         node_id: String,
     },
-    /// 用户单击 server 或右键 "连接",请求开 terminal pane 跑 ssh +
-    /// SecretInjector。
+    /// The user clicked a server or picked "Connect" from the context menu; request opening a terminal pane running ssh +
+    /// SecretInjector.
     OpenSshTerminal {
         node_id: String,
         server: SshServerInfo,
     },
-    /// 用户右键 "SFTP 浏览",请求开 SFTP 文件浏览器 pane。
+    /// The user picked "SFTP browse" from the context menu; request opening the SFTP file browser pane.
     OpenSftpPane {
         node_id: String,
         server: SshServerInfo,
@@ -132,12 +132,12 @@ pub enum SshManagerPanelEvent {
 struct RenameState {
     node_id: String,
     editor: ViewHandle<EditorView>,
-    /// 是否由新建文件夹自动触发的重命名。
+    /// Whether the rename was triggered automatically by creating a new folder.
     is_newly_created: bool,
 }
 
-/// 单条 candidate 行的内容字段 —— 把渲染时关心的几个 Option 装一个 struct,
-/// 避免 `render_candidate_row` 的参数列表过长(clippy::too_many_arguments)。
+/// Content fields of a single candidate row: the Option fields needed at render time packed into one struct,
+/// to avoid a long parameter list on `render_candidate_row` (clippy::too_many_arguments).
 struct CandidateRowFields<'a> {
     alias: &'a str,
     hostname: Option<&'a str>,
@@ -146,17 +146,17 @@ struct CandidateRowFields<'a> {
     added: bool,
 }
 
-/// 主题色配对 —— 已导入行用 muted,普通行用 main。
+/// Theme color pair: imported rows use muted, normal rows use main.
 #[derive(Copy, Clone)]
 struct CandidateRowColors {
     main: warp_core::ui::theme::Fill,
     muted: warp_core::ui::theme::Fill,
 }
 
-/// 拖拽落点 metadata。`parent_id = None` 表示拖到 panel 空白处(放回 root);
-/// `Some(folder_id)` 表示拖进该文件夹;**不允许**直接拖到 server 上(server
-/// 不能有 children)— 这种情况 drop_data 解释为"拖到 server 的兄弟位置",即
-/// `parent_id = server.parent_id`,在 dispatch action 时已展开。
+/// Drop target metadata. `parent_id = None` means dropped on empty panel space (back to root);
+/// `Some(folder_id)` means dropped into that folder; dropping directly onto a server is **not allowed** (a server
+/// cannot have children). In that case drop_data is interpreted as "drop at the server's sibling position", i.e.
+/// `parent_id = server.parent_id`, already expanded when the action is dispatched.
 #[derive(Debug, Clone)]
 struct SshDropData {
     parent_id: Option<String>,
@@ -177,23 +177,23 @@ pub struct SshManagerPanel {
     add_server_btn: MouseStateHandle,
     toggle_all_btn: MouseStateHandle,
     row_states: HashMap<String, MouseStateHandle>,
-    /// 每行的 DraggableState — 跨渲染保持拖拽进度,所以必须 cache 在 view state。
+    /// DraggableState per row: keeps drag progress across renders, so it must be cached in view state.
     row_drag_states: HashMap<String, DraggableState>,
 
     context_menu_position: Option<Vector2F>,
     context_menu_target: Option<String>,
     context_menu_item_states: Vec<MouseStateHandle>,
 
-    /// 当前正在重命名的节点(编辑器 + node_id)。
+    /// The node currently being renamed (editor + node_id).
     rename_state: Option<RenameState>,
 
-    /// `~/.ssh/config` 候选视图模型 —— PRODUCT.md decision A/B/C/D/E。
+    /// `~/.ssh/config` candidate view model: PRODUCT.md decision A/B/C/D/E.
     candidates: ModelHandle<CandidatesViewModel>,
-    /// 每条 candidate 行的 hover state(key = alias)。
+    /// Hover state for each candidate row (key = alias).
     candidate_row_states: HashMap<String, MouseStateHandle>,
-    /// 每条 candidate 行 "+" / "Added" 按钮的 hover state(key = alias)。
+    /// Hover state for each candidate row's "+" / "Added" button (key = alias).
     candidate_add_states: HashMap<String, MouseStateHandle>,
-    /// 区段头的 Refresh / Toggle 按钮 hover state。
+    /// Hover states for the section header's Refresh / Toggle buttons.
     candidates_refresh_btn: MouseStateHandle,
     candidates_toggle_btn: MouseStateHandle,
 
@@ -226,7 +226,7 @@ impl SshManagerPanel {
             candidates_toggle_btn: MouseStateHandle::default(),
             content_scroll_state: ClippedScrollStateHandle::default(),
         };
-        // 面板首次打开 → 立刻读一次 ssh_config(PRODUCT.md decision A)。
+        // Panel opened for the first time: read ssh_config once immediately (PRODUCT.md decision A).
         me.candidates.update(ctx, |vm, ctx| vm.refresh(ctx));
         me.refresh_tree(ctx);
 
@@ -237,7 +237,7 @@ impl SshManagerPanel {
             },
         );
 
-        // 监听 SshSettings 变更，当自动发现开关切换时刷新候选区段。
+        // Listen for SshSettings changes; refresh the candidates section when the auto-discovery toggle flips.
         ctx.subscribe_to_model(&SshSettings::handle(ctx), |me, _, _, ctx| {
             me.candidates.update(ctx, |vm, ctx| vm.refresh(ctx));
             me.sync_candidate_row_states(ctx);
@@ -257,7 +257,7 @@ impl SshManagerPanel {
                         self.selected_id = None;
                     }
                 }
-                // 重命名中的节点若被外部删除,清掉 rename_state
+                // If the node being renamed was deleted externally, clear rename_state
                 if let Some(rs) = self.rename_state.as_ref() {
                     if !self.nodes.iter().any(|n| n.id == rs.node_id) {
                         self.rename_state = None;
@@ -281,9 +281,9 @@ impl SshManagerPanel {
             self.row_drag_states.entry(n.id.clone()).or_default();
         }
 
-        // 树变化 → 重算 "Added" 集合(PRODUCT.md decision E)。"已导入"按
-        // `server.host == candidate.alias` 判定 —— 与 ImportCandidate 的写入
-        // 语义对齐(decision I:导入时 `server.host = alias`)。
+        // Tree changed: recompute the "Added" set (PRODUCT.md decision E). "Imported" is judged by
+        // `server.host == candidate.alias`, matching the write
+        // semantics of ImportCandidate (decision I: on import `server.host = alias`).
         let auto_discover = *SshSettings::as_ref(ctx).enable_ssh_auto_discovery.value();
         if auto_discover {
             let hosts = list_server_hosts();
@@ -295,9 +295,9 @@ impl SshManagerPanel {
         ctx.notify();
     }
 
-    /// 让 `candidate_row_states` / `candidate_add_states` 的 key 集合与当前
-    /// candidates view-model 的 alias 一致。多余的 hover state 删掉(释放内存),
-    /// 缺的别名补一个默认 state(行被新加进来后第一次 hover 不会丢状态)。
+    /// Make the key sets of `candidate_row_states` / `candidate_add_states` match the aliases in the current
+    /// candidates view model. Extra hover states are dropped (frees memory),
+    /// missing aliases get a default state (so a newly added row does not lose state on its first hover).
     fn sync_candidate_row_states(&mut self, ctx: &mut ViewContext<Self>) {
         let aliases: Vec<String> = self
             .candidates
@@ -324,7 +324,7 @@ impl SshManagerPanel {
         }
     }
 
-    /// 新建文件夹。`parent` 为 None 时在根级创建。
+    /// Create a folder. When `parent` is None, create at root level.
     fn on_add_folder_with_parent(&mut self, parent: Option<String>, ctx: &mut ViewContext<Self>) {
         let result = warp_ssh_manager::with_conn(|c| {
             let name = unique_name(c, parent.as_deref(), "New folder")?;
@@ -335,7 +335,7 @@ impl SshManagerPanel {
                 let new_id = node.id.clone();
                 self.selected_id = Some(new_id.clone());
                 self.refresh_tree(ctx);
-                // 新建即重命名 — Drive 习惯。
+                // Rename right after creation: Drive convention.
                 self.enter_rename(new_id, true, ctx);
             }
             Err(e) => {
@@ -345,19 +345,19 @@ impl SshManagerPanel {
         }
     }
 
-    /// 把 `~/.ssh/config` 中一条候选导入为新的 saved server。
+    /// Import one candidate from `~/.ssh/config` as a new saved server.
     ///
-    /// 字段映射严格按 TECH.md §3.3 / PRODUCT.md decision I/J/K:
-    /// - `server.host = alias`(保留 OpenSSH 别名语义,启动 `ssh` 时仍能套
-    ///   上 `~/.ssh/config` 里的 `ProxyJump` 等指令);
-    /// - `port = candidate.port.unwrap_or(22)`(decision K 的"port=None → 22");
-    /// - `auth_type = Key if identity_file.is_some() else Password`(decision J);
-    /// - `notes = "Imported from <resolved path>"`(供用户日后回溯来源)。
+    /// Field mapping follows TECH.md §3.3 / PRODUCT.md decision I/J/K strictly:
+    /// - `server.host = alias` (keeps OpenSSH alias semantics, so `ssh` still picks
+    ///   up directives such as `ProxyJump` from `~/.ssh/config` when launched);
+    /// - `port = candidate.port.unwrap_or(22)` (decision K: "port=None -> 22");
+    /// - `auth_type = Key if identity_file.is_some() else Password` (decision J);
+    /// - `notes = "Imported from <resolved path>"` (so the user can trace the origin later).
     ///
-    /// 通过 `SshRepository::create_server` 写入,与手动 "New server" 走同一条
-    /// 持久化路径 —— 任何对该 SQLite 行的 schema 变更,导入路径自动跟上。
-    /// 完成后 emit `OpenServerEditor`(与手动新建一致)+ 广播
-    /// `SshTreeChangedEvent::TreeChanged` 让 `Added` 徽章立刻翻牌。
+    /// Written via `SshRepository::create_server`, the same persistence path as a manual "New server"; any
+    /// schema change to that SQLite row is automatically picked up by the import path.
+    /// On completion, emit `OpenServerEditor` (same as manual creation) + broadcast
+    /// `SshTreeChangedEvent::TreeChanged` so the `Added` badge flips immediately.
     fn on_import_candidate(&mut self, alias: String, ctx: &mut ViewContext<Self>) {
         let candidate = self
             .candidates
@@ -378,7 +378,7 @@ impl SshManagerPanel {
         };
         let info = SshServerInfo {
             node_id: String::new(),
-            // PRODUCT.md decision I:存别名而不是解析后的 HostName。
+            // PRODUCT.md decision I: store the alias, not the resolved HostName.
             host: c.alias.clone(),
             port: c.port.unwrap_or(22),
             username: c.user.clone().unwrap_or_default(),
@@ -395,8 +395,8 @@ impl SshManagerPanel {
 
         let parent = self.parent_for_new_node();
         let result = warp_ssh_manager::with_conn(|conn| {
-            // 名字与手动 "New server" 相同的"自动避重"逻辑(unique_name);
-            // 第一条候选用别名当名字,撞名追加 " 2"、" 3" …
+            // Same "auto-avoid duplicates" logic as manual "New server" (unique_name);
+            // the first candidate uses the alias as its name, and on a name collision append " 2", " 3" ...
             let name = unique_name(conn, parent.as_deref(), &c.alias)?;
             Ok(SshRepository::create_server(
                 conn,
@@ -410,9 +410,9 @@ impl SshManagerPanel {
                 let new_id = node.id.clone();
                 self.selected_id = Some(new_id.clone());
                 self.refresh_tree(ctx);
-                // 与手动新建保持一致:打开中央编辑 pane,让用户填密码/微调字段。
+                // Same as manual creation: open the central editor pane so the user can fill in the password / tweak fields.
                 ctx.emit(SshManagerPanelEvent::OpenServerEditor { node_id: new_id });
-                // 广播树变更 —— Candidates 区段的 added_aliases 据此刷新。
+                // Broadcast the tree change: the Candidates section's added_aliases refreshes from it.
                 SshTreeChangedNotifier::handle(ctx).update(ctx, |_, ctx| {
                     ctx.emit(SshTreeChangedEvent::TreeChanged);
                 });
@@ -441,8 +441,8 @@ impl SshManagerPanel {
                 let new_id = node.id.clone();
                 self.selected_id = Some(new_id.clone());
                 self.refresh_tree(ctx);
-                // 服务器新建后打开中央编辑 pane(用户填字段)— 名字编辑跟字段
-                // 一起在那里改,不在树里内联编辑。
+                // After creating a server, open the central editor pane (the user fills in fields); name editing happens
+                // there together with the fields, not inline in the tree.
                 ctx.emit(SshManagerPanelEvent::OpenServerEditor { node_id: new_id });
             }
             Err(e) => {
@@ -472,7 +472,7 @@ impl SshManagerPanel {
 
             let new_node = SshRepository::create_server(c, parent.as_deref(), &name, &cloned_info)?;
 
-            // 源服务器在上面已校验存在,直接把 keychain 里的密码 / 私钥口令复制到新节点。
+            // The source server was validated above; copy the keychain password / key passphrase straight to the new node.
             let store = KeychainSecretStore;
             if let Ok(Some(password)) = store.get(&source_id, SecretKind::Password) {
                 let _ = store.set(&new_node.id, SecretKind::Password, &password);
@@ -526,7 +526,7 @@ impl SshManagerPanel {
         self.dispatch_connect_for(&id, ctx);
     }
 
-    /// 右键 "SFTP 浏览":emit OpenSftpPane 事件。
+    /// Right-click "SFTP browse": emit the OpenSftpPane event.
     fn on_open_sftp(&mut self, ctx: &mut ViewContext<Self>) {
         let Some(id) = self.selected_id.clone() else {
             return;
@@ -568,14 +568,14 @@ impl SshManagerPanel {
         };
         let kind = self.nodes.iter().find(|n| n.id == id).map(|n| n.kind);
         if !matches!(kind, Some(NodeKind::Server)) {
-            // folder 的 "编辑" = 重命名
+            // "Edit" on a folder = rename
             self.enter_rename(id, false, ctx);
             return;
         }
         ctx.emit(SshManagerPanelEvent::OpenServerEditor { node_id: id });
     }
 
-    /// 双击 server = 连接(开新 tab)。Folder 双击 = 两次 toggle 相互抵消,no-op。
+    /// Double-click server = connect (open a new tab). Double-clicking a folder = two toggles that cancel out, no-op.
     fn on_double_click(&mut self, id: String, ctx: &mut ViewContext<Self>) {
         let kind = self.nodes.iter().find(|n| n.id == id).map(|n| n.kind);
         if matches!(kind, Some(NodeKind::Server)) {
@@ -583,7 +583,7 @@ impl SshManagerPanel {
         }
     }
 
-    /// 切换单个 folder 的折叠状态;server 节点忽略。
+    /// Toggle the collapsed state of a single folder; ignored for server nodes.
     fn on_toggle_node_collapsed(&mut self, node_id: &str, ctx: &mut ViewContext<Self>) {
         let kind = self.nodes.iter().find(|n| n.id == node_id).map(|n| n.kind);
         if !matches!(kind, Some(NodeKind::Folder)) {
@@ -610,13 +610,13 @@ impl SshManagerPanel {
         });
     }
 
-    /// 顶部按钮:任何 folder 当前是展开 → 全部折叠;全部都已折叠 → 全部展开。
+    /// Top button: if any folder is currently expanded, collapse all; if all are collapsed, expand all.
     fn on_toggle_all_folders(&mut self, ctx: &mut ViewContext<Self>) {
         let any_expanded = self
             .nodes
             .iter()
             .any(|n| matches!(n.kind, NodeKind::Folder) && !n.is_collapsed);
-        let new_collapsed = any_expanded; // 至少一个展开 → 全收;否则全展
+        let new_collapsed = any_expanded; // at least one expanded -> collapse all; otherwise expand all
         let result = warp_ssh_manager::with_conn(|c| {
             Ok(SshRepository::set_all_folders_collapsed(c, new_collapsed)?)
         });
@@ -631,14 +631,14 @@ impl SshManagerPanel {
         });
     }
 
-    /// 节点是否在视觉上可见 — 任一祖先 folder 是 collapsed 就隐藏。
-    /// root-level 节点永远可见。
+    /// Whether the node is visually visible: hidden if any ancestor folder is collapsed.
+    /// Root-level nodes are always visible.
     fn is_visible(&self, node: &SshNode) -> bool {
         let mut cursor = node.parent_id.as_deref();
         while let Some(pid) = cursor {
             let parent = match self.nodes.iter().find(|n| n.id == pid) {
                 Some(p) => p,
-                None => return true, // 数据不一致,保险起见显示
+                None => return true, // inconsistent data; show it to be safe
             };
             if matches!(parent.kind, NodeKind::Folder) && parent.is_collapsed {
                 return false;
@@ -649,7 +649,7 @@ impl SshManagerPanel {
     }
 
     fn on_click(&mut self, id: String, ctx: &mut ViewContext<Self>) {
-        // 点击其他行 = 退出当前重命名(commit)
+        // Clicking another row = leave the current rename (commit)
         if self
             .rename_state
             .as_ref()
@@ -659,19 +659,19 @@ impl SshManagerPanel {
             self.commit_rename(ctx);
         }
 
-        // commit_rename 对新建文件夹(is_newly_created)会清空 selected_id,但单击跳转的
-        // 语义就是选中被点击项,故这里立即覆盖为新 id 是预期行为 —— 清空只针对 Enter/ESC/
-        // 失焦到空白这类无新选择的退出路径,单击本身已提供了新的选择上下文。
+        // commit_rename clears selected_id for a newly created folder (is_newly_created), but a click
+        // means selecting the clicked item, so overwriting with the new id immediately is intended. Clearing only applies to
+        // exit paths with no new selection, such as Enter/ESC/blur to empty space; the click itself already provides the new selection context.
         self.selected_id = Some(id.clone());
         let kind = self.nodes.iter().find(|n| n.id == id).map(|n| n.kind);
         match kind {
             Some(NodeKind::Server) => {
-                // 单击 server = 仅选中。**连接走双击**(`on_double_click`)。
+                // Click server = select only. **Connecting is on double-click** (`on_double_click`).
             }
             Some(NodeKind::Folder) => {
-                // 单击 folder = 折叠/展开切换(选中已经在上面做了)
+                // Click folder = toggle collapse/expand (selection was already done above)
                 self.on_toggle_node_collapsed(&id, ctx);
-                return; // on_toggle 内部已 ctx.notify
+                return; // on_toggle already calls ctx.notify internally
             }
             None => {}
         }
@@ -684,14 +684,14 @@ impl SshManagerPanel {
         position: Vector2F,
         ctx: &mut ViewContext<Self>,
     ) {
-        // 打开菜单前关掉 rename(否则重命名 buffer 会丢)。
+        // Close rename before opening the menu (otherwise the rename buffer would be lost).
         if self.rename_state.is_some() {
             self.commit_rename(ctx);
         }
         if let Some(t) = target.as_ref() {
             self.selected_id = Some(t.clone());
         } else {
-            // 右键空白区域表示在根级操作，清除旧的选中状态。
+            // Right-clicking empty space means acting at root level; clear the old selection.
             self.selected_id = None;
         }
         self.context_menu_target = target;
@@ -740,7 +740,7 @@ impl SshManagerPanel {
             editor
         });
 
-        // 监听 Enter / Blurred → commit;Escape → cancel。
+        // Listen for Enter / Blurred -> commit; Escape -> cancel.
         ctx.subscribe_to_view(&editor, |me, _, event, ctx| match event {
             EditorEvent::Enter => me.commit_rename(ctx),
             EditorEvent::Blurred => me.commit_rename(ctx),
@@ -765,7 +765,7 @@ impl SshManagerPanel {
         let id = rs.node_id.clone();
         let was_newly_created = rs.is_newly_created;
         if new_name.is_empty() {
-            // 名字不能为空:撤销。新建文件夹时同时清除选中。
+            // Name must not be empty: undo. When creating a folder, also clear the selection.
             if was_newly_created {
                 self.selected_id = None;
             }
@@ -779,7 +779,7 @@ impl SshManagerPanel {
             ctx.emit(SshManagerPanelEvent::PersistenceError(e.to_string()));
             return;
         }
-        // 新建文件夹重命名完成后清除选中，使下次"新建文件夹"创建在根级。
+        // After a new folder's rename completes, clear the selection so the next "New folder" is created at root level.
         if was_newly_created {
             self.selected_id = None;
         }
@@ -791,7 +791,7 @@ impl SshManagerPanel {
 
     fn cancel_rename(&mut self, ctx: &mut ViewContext<Self>) {
         if let Some(rs) = self.rename_state.take() {
-            // 新建文件夹取消重命名后清除选中，使下次"新建文件夹"创建在根级。
+            // After a new folder's rename is cancelled, clear the selection so the next "New folder" is created at root level.
             if rs.is_newly_created {
                 self.selected_id = None;
             }
@@ -799,14 +799,14 @@ impl SshManagerPanel {
         ctx.notify();
     }
 
-    /// 检查把 `dragged` 移到 `new_parent` 是否会产生环(`new_parent` 是
-    /// `dragged` 的子孙 / 自己 / 已经是当前 parent 也直接 reject 省一次写)。
+    /// Check whether moving `dragged` to `new_parent` would create a cycle (`new_parent` is
+    /// a descendant of `dragged` / itself / already the current parent, which is also rejected to save a write).
     fn move_is_legal(&self, dragged: &str, new_parent: Option<&str>) -> bool {
-        // 移到自身下:禁止
+        // Move under itself: forbidden
         if Some(dragged) == new_parent {
             return false;
         }
-        // 不动:reject(避免 idempotent 写)
+        // No movement: reject (avoids an idempotent write)
         let current_parent = self
             .nodes
             .iter()
@@ -815,7 +815,7 @@ impl SshManagerPanel {
         if current_parent == new_parent {
             return false;
         }
-        // 把 folder 移到自己的子孙下:禁止(环)
+        // Move a folder under its own descendant: forbidden (cycle)
         if let Some(target_parent) = new_parent {
             let mut cursor = Some(target_parent);
             while let Some(id) = cursor {
@@ -839,8 +839,8 @@ impl SshManagerPanel {
         ctx: &mut ViewContext<Self>,
     ) {
         if !self.move_is_legal(&node_id, new_parent_id.as_deref()) {
-            // 升级到 warn:用户拖拽看不到效果时这条日志比 debug 更易找。
-            // 大多数 false 来自"拖到当前所在 parent / 拖到自己"。
+            // Upgraded to warn: when a drag shows no effect, this log is easier to find than debug.
+            // Most false results come from "dragging to the current parent / onto itself".
             let current_parent = self
                 .nodes
                 .iter()
@@ -851,9 +851,9 @@ impl SshManagerPanel {
             );
             return;
         }
-        // sort_order 取目标 parent 当前最大值 +1(排在末尾)。简化的方式:
-        // 用 i32::MAX/2 让 SQL 层把它放最后(后续 normalize)。这里走 SQL
-        // 查询拿真实 next_sort_order。
+        // sort_order takes the target parent's current maximum + 1 (placed last). Simplified approach:
+        // use i32::MAX/2 so the SQL layer puts it last (normalized later). Here we go through an SQL
+        // query to get the real next_sort_order.
         let result = warp_ssh_manager::with_conn(|c| {
             use diesel::prelude::*;
             use persistence::schema::ssh_nodes;
@@ -923,7 +923,7 @@ impl SshManagerPanel {
             .finish()
         };
 
-        // 左侧组:新建按钮
+        // Left group: new button
         let left_group = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(4.0)
@@ -940,8 +940,8 @@ impl SshManagerPanel {
             .with_main_axis_size(MainAxisSize::Min)
             .finish();
 
-        // 右侧:折叠/展开全部按钮 — 智能切换。任一 folder 当前展开 → 显示
-        // ChevronUp(意思是"折起"),否则显示 ChevronDown(意思是"展开")。
+        // Right side: collapse/expand all button, a smart toggle. If any folder is currently expanded, show
+        // ChevronUp (meaning "collapse"), otherwise ChevronDown (meaning "expand").
         let any_expanded = self
             .nodes
             .iter()
@@ -957,7 +957,7 @@ impl SshManagerPanel {
             SshManagerPanelAction::ToggleAllFolders,
         );
 
-        // 整条 toolbar:左右两端对齐(MainAxisAlignment::SpaceBetween)。
+        // Whole toolbar: left and right ends aligned (MainAxisAlignment::SpaceBetween).
         Flex::row()
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(warpui::elements::MainAxisAlignment::SpaceBetween)
@@ -967,11 +967,11 @@ impl SshManagerPanel {
             .finish()
     }
 
-    /// "Candidates" 区段 —— 从 `~/.ssh/config` 解析出的可导入主机列表。
+    /// "Candidates" section: list of importable hosts parsed from `~/.ssh/config`.
     ///
-    /// 区段在已保存树**上方**展示;布局风格(行高、缩进、字号)与树保持一致,
-    /// 仅在区段头多一个 Refresh 按钮 + 折叠 chevron。每条候选行尾跟一个
-    /// "+" 或 "Added" 徽章(PRODUCT.md decision E)。
+    /// The section is shown **above** the saved tree; layout style (row height, indent, font size) matches the tree,
+    /// with only a Refresh button + collapse chevron added in the section header. Each candidate row ends with a
+    /// "+" or "Added" badge (PRODUCT.md decision E).
     fn render_candidates(
         &self,
         appearance: &warp_core::ui::appearance::Appearance,
@@ -980,8 +980,8 @@ impl SshManagerPanel {
         let theme = appearance.theme();
         let rows = self.candidates.as_ref(app).rows();
         if rows.is_empty() {
-            // 还没调过 refresh —— 完全不渲染区段(panel 还没 mount 时不应该发生,
-            // 因为 new() 里立刻调一次,但保险起见兜底)。
+            // refresh was never called: do not render the section at all (should not happen once the panel is mounted,
+            // since new() calls it immediately; kept as a safety fallback).
             return Empty::new().finish();
         }
 
@@ -1029,8 +1029,8 @@ impl SshManagerPanel {
                     path_display,
                     message,
                 } => {
-                    // 错误行用 error 红色 —— `ui_error_color` 直接返回 ColorU,
-                    // 跟 `ai_assistant/panel.rs` 里"超字数计数器"用同样套路。
+                    // Error rows use the error red: `ui_error_color` returns a ColorU directly,
+                    // the same approach as the "over-limit character counter" in `ai_assistant/panel.rs`.
                     let err_color: pathfinder_color::ColorU = theme.ui_error_color();
                     col.add_child(self.render_candidates_message_color(
                         &crate::t!(
@@ -1080,7 +1080,7 @@ impl SshManagerPanel {
         let icon_color = theme.sub_text_color(theme.background());
         let muted = theme.sub_text_color(theme.background());
 
-        // 折叠态 chevron(▶) vs 展开态(▼) —— is_expanded 直接从 view-model 取。
+        // Collapsed chevron (▶) vs expanded (▼): is_expanded is taken directly from the view model.
         let expanded = self.candidates.as_ref(app).is_expanded();
         let chevron_icon = if expanded {
             crate::ui_components::icons::Icon::ChevronDown
@@ -1112,7 +1112,7 @@ impl SshManagerPanel {
         .with_color(muted.into())
         .finish();
 
-        // 右侧 Refresh 按钮 —— 任何状态(NotFound / Error / Loaded)都允许刷新。
+        // Refresh button on the right: refreshing is allowed in any state (NotFound / Error / Loaded).
         let refresh_state = self.candidates_refresh_btn.clone();
         let refresh_icon = ConstrainedBox::new(
             crate::ui_components::icons::Icon::Refresh
@@ -1138,8 +1138,8 @@ impl SshManagerPanel {
             refresh_icon
         };
 
-        // 整行:chevron + 标签(吃中间空间)+ count + Refresh 按钮。
-        // 使用 MainAxisSize::Max 让整行填满面板宽度,消除右侧留白。
+        // Whole row: chevron + label (takes the middle space) + count + Refresh button.
+        // Use MainAxisSize::Max so the row fills the panel width and removes the blank space on the right.
         let row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(ITEM_ICON_TEXT_SPACING)
@@ -1156,7 +1156,7 @@ impl SshManagerPanel {
             .with_main_axis_alignment(MainAxisAlignment::Start)
             .finish();
 
-        // 整个 header 点击 = toggle(类似 folder 行的 single-click)。
+        // Clicking the whole header = toggle (like a single click on a folder row)
         let toggle_state = self.candidates_toggle_btn.clone();
         Hoverable::new(toggle_state, move |_| {
             Container::new(row)
@@ -1196,8 +1196,8 @@ impl SshManagerPanel {
         .finish()
     }
 
-    /// 同 `render_candidates_message`,但接收 `ColorU` —— Error 行用主题的
-    /// `ui_error_color()` 直接返回的红色,避免再走一次 Fill 包装。
+    /// Same as `render_candidates_message`, but takes a `ColorU`: Error rows use the red returned directly by the theme's
+    /// `ui_error_color()`, avoiding another Fill wrapper.
     fn render_candidates_message_color(
         &self,
         text: &str,
@@ -1243,8 +1243,8 @@ impl SshManagerPanel {
             .with_height(ITEM_ICON_SIZE)
             .finish();
 
-        // 主标签 = alias;副标签 = "user@hostname:port" 简写,均按可选拼。
-        // 已导入时整行字体颜色调淡(decision E:dimmed)。
+        // Main label = alias; secondary label = "user@hostname:port" shorthand, each part assembled only if present.
+        // When already imported, dim the whole row's font color (decision E: dimmed).
         let label_color = if added { muted } else { main };
         let alias_text = Text::new_inline(
             alias.to_string(),
@@ -1259,7 +1259,7 @@ impl SshManagerPanel {
             subtitle_parts.push(u.to_string());
         }
         if let Some(h) = hostname {
-            // user@host;无 user 时只显示 host
+            // user@host; with no user, show only host
             let last = subtitle_parts.last_mut();
             match last {
                 Some(s) => *s = format!("{s}@{h}"),
@@ -1267,7 +1267,7 @@ impl SshManagerPanel {
             }
         }
         if let Some(p) = port {
-            // 拼到最后一个段末尾的 :port;若 user/hostname 都缺,单独 :port。
+            // Append :port to the end of the last segment; if both user/hostname are missing, show :port alone.
             if let Some(last) = subtitle_parts.last_mut() {
                 *last = format!("{last}:{p}");
             } else {
@@ -1296,7 +1296,7 @@ impl SshManagerPanel {
         }
         let label_block = label_col.with_main_axis_size(MainAxisSize::Min).finish();
 
-        // 行尾的 "+" 按钮或 "Added" 徽章。
+        // "+" button or "Added" badge at the end of the row.
         let add_state = self
             .candidate_add_states
             .get(alias)
@@ -1304,7 +1304,7 @@ impl SshManagerPanel {
             .unwrap_or_default();
         let alias_for_click = alias.to_string();
         let trailing: Box<dyn Element> = if added {
-            // PRODUCT.md decision E:已导入 → 显示 "Added"(无点击交互)。
+            // PRODUCT.md decision E: already imported -> show "Added" (no click interaction).
             Text::new_inline(
                 crate::t!("workspace-left-panel-ssh-manager-candidates-added"),
                 appearance.ui_font_family(),
@@ -1336,7 +1336,7 @@ impl SshManagerPanel {
             .finish()
         };
 
-        // 使用 MainAxisSize::Max 让候选行填满面板宽度,消除右侧留白。
+        // Use MainAxisSize::Max so candidate rows fill the panel width and remove the blank space on the right.
         let row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(ITEM_ICON_TEXT_SPACING)
@@ -1410,7 +1410,7 @@ impl SshManagerPanel {
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
             .with_main_axis_size(MainAxisSize::Min)
             .finish();
-        // 空白处右键 = 节点 None 的 OpenContextMenu。
+        // Right-click on empty space = OpenContextMenu with node None.
         let hoverable = Hoverable::new(MouseStateHandle::default(), move |_| inner)
             .on_right_click(|ctx, _, position| {
                 let offset = match ctx.element_position_by_id(SSH_PANEL_POSITION_ID) {
@@ -1423,8 +1423,8 @@ impl SshManagerPanel {
                 });
             })
             .finish();
-        // 整个 tree 区域也是个 drop target,parent_id=None 表示拖到 root。
-        // 行级 DropTarget 优先级高(更小),所以拖到 folder 上还是会进 folder。
+        // The whole tree area is also a drop target; parent_id=None means dropped at root.
+        // Row-level DropTarget has higher priority (smaller), so dragging onto a folder still goes into the folder.
         DropTarget::new(hoverable, SshDropData { parent_id: None }).finish()
     }
 
@@ -1452,8 +1452,8 @@ impl SshManagerPanel {
             .with_height(ITEM_ICON_SIZE)
             .finish();
 
-        // Folder 行前面加 chevron(▼ 展开 / ▶ 折叠);Server 行用等宽空白占位
-        // 让所有行的图标对齐。
+        // Folder rows get a chevron in front (▼ expanded / ▶ collapsed); server rows use an equal-width blank placeholder
+        // so all row icons align.
         let chevron_el: Box<dyn Element> = match node.kind {
             NodeKind::Folder => {
                 let chevron_icon = if node.is_collapsed {
@@ -1471,10 +1471,10 @@ impl SshManagerPanel {
                 .finish(),
         };
 
-        // 右半 — 文本或重命名输入框。
-        // EditorView 必须在有限宽度容器里渲染,否则 element.rs:1670 会
-        // panic("infinite width constraint on buffer elements")。Flex::row 的 child
-        // 没有 column-stretch 语义,所以这里包 ConstrainedBox 给个固定宽度。
+        // Right half: text or rename input.
+        // EditorView must be rendered in a bounded-width container, otherwise element.rs:1670 will
+        // panic("infinite width constraint on buffer elements"). Children of Flex::row have no
+        // column-stretch semantics, so wrap in a ConstrainedBox here to give a fixed width.
         let label_or_editor: Box<dyn Element> = if is_renaming {
             let editor_handle = self
                 .rename_state
@@ -1511,7 +1511,7 @@ impl SshManagerPanel {
             .finish()
         };
 
-        // 使用 MainAxisSize::Max 让树节点行填满面板宽度,消除右侧留白。
+        // Use MainAxisSize::Max so tree node rows fill the panel width and remove the blank space on the right.
         let row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(ITEM_ICON_TEXT_SPACING)
@@ -1531,7 +1531,7 @@ impl SshManagerPanel {
         let id_for_double_click = node.id.clone();
         let id_for_right_click = node.id.clone();
 
-        // 重命名时不接收点击/右键(交给 EditorView)。
+        // While renaming, do not receive click/right-click (left to EditorView).
         if is_renaming {
             return Container::new(row)
                 .with_padding_top(ITEM_PADDING_VERTICAL)
@@ -1575,16 +1575,16 @@ impl SshManagerPanel {
         })
         .finish();
 
-        // 把 row 包成"既可拖也接受 drop"的元素。
+        // Wrap the row as an element that is both draggable and accepts drops.
         //
-        // **关键嵌套**:`DropTarget(Container(Draggable(Hoverable)))`。
-        // 没有 Container 层会出 bug —— `Draggable::origin()` 返回 `child.origin()`
-        // (`crates/warpui_core/src/elements/drag/draggable.rs:746-757`),而
-        // child 在 Dragging 状态被 paint 到 drag_origin,导致 child.origin() =
-        // ghost 位置。结果 DropTarget 直接套 Draggable 时,bounds 跟着 ghost
-        // 跑 → drop target 永远在鼠标下,落不到别的行。Container.origin/size
-        // 在自己的 paint 里锁定 layout 值(`container.rs:288 self.origin = ...`),
-        // 给 DropTarget 提供稳定 bounds。
+        // **Key nesting**: `DropTarget(Container(Draggable(Hoverable)))`.
+        // Without the Container layer there is a bug: `Draggable::origin()` returns `child.origin()`
+        // (`crates/warpui_core/src/elements/drag/draggable.rs:746-757`), and
+        // the child is painted at drag_origin while Dragging, so child.origin() =
+        // the ghost position. With a DropTarget directly wrapping Draggable, the bounds follow the ghost
+        // -> the drop target is always under the mouse and can never land on another row. Container.origin/size
+        // lock the layout values in its own paint (`container.rs:288 self.origin = ...`),
+        // giving DropTarget stable bounds.
         let drag_state = self
             .row_drag_states
             .get(&node.id)
@@ -1609,7 +1609,7 @@ impl SshManagerPanel {
             })
             .finish();
 
-        // 中间锁定 layout 原点的 Container — 看上面注释。
+        // Container in the middle that locks the layout origin; see the comment above.
         let stable_anchor = Container::new(draggable).finish();
 
         let drop_parent_id = match node.kind {
@@ -1814,9 +1814,9 @@ impl View for SshManagerPanel {
             .with_uniform_padding(8.0)
             .finish();
 
-        // PRODUCT.md §2:Candidates 区段在已保存树**上方**,共享同一面板
-        // 水平内边距。区段在 view-model 还没 refresh 时返回 Empty,不会占
-        // 高度。自动发现关闭时不渲染区段。
+        // PRODUCT.md §2: the Candidates section is above the saved tree, sharing the same panel
+        // horizontal padding. The section returns Empty before the view model has refreshed, taking no
+        // height. When auto-discovery is off, the section is not rendered.
         let auto_discover = *SshSettings::as_ref(app).enable_ssh_auto_discovery.value();
         let candidates_section = if auto_discover {
             Container::new(self.render_candidates(appearance, app))
@@ -1883,10 +1883,10 @@ impl View for SshManagerPanel {
 
 // --- helpers --------------------------------------------------------------
 
-/// 根据当前选中项和节点列表，计算新建节点的父级 ID。
-/// - 选中文件夹 → 作为子节点创建在该文件夹下
-/// - 选中服务器 → 作为兄弟节点创建（继承服务器的父级）
-/// - 无选中 → 创建在根级（返回 None）
+/// Compute the parent ID of a new node from the current selection and the node list.
+/// - Folder selected -> create as a child under that folder
+/// - Server selected -> create as a sibling (inherits the server's parent)
+/// - Nothing selected -> create at root level (returns None)
 fn resolve_parent_for_new_node(selected_id: Option<&str>, nodes: &[SshNode]) -> Option<String> {
     let id = selected_id?;
     let node = nodes.iter().find(|n| n.id == id)?;
@@ -1965,9 +1965,9 @@ fn compute_depths(nodes: &[SshNode]) -> HashMap<String, usize> {
     depths
 }
 
-/// 一次性拉所有 ssh_servers 行的 `host` 字段。失败时返回空 Vec —— 候选区段的
-/// "Added" 徽章在 SQLite 临时挂掉时就当成"没有任何已导入项"渲染,不至于让
-/// 整个面板崩。
+/// Fetch the `host` field of all ssh_servers rows at once. On failure returns an empty Vec; the candidates section's
+/// "Added" badge renders as "nothing imported" when SQLite is temporarily down, instead of crashing
+/// the whole panel.
 fn list_server_hosts() -> Vec<String> {
     use diesel::prelude::*;
     use persistence::schema::ssh_servers;
