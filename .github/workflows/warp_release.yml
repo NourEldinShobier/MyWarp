@@ -52,7 +52,7 @@ jobs:
     steps:
       # fetch-depth: 0 lets git-cliff see the full tag/commit history;
       # with a shallow clone `git describe` cannot find the previous tag and release notes degrade to empty.
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -160,7 +160,7 @@ jobs:
             dmg_name_suffix: arm64
             runner: macos-26 # Pro standard arm64 (M2 Pro)
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ needs.prepare_metadata.outputs.release_branch }}
 
@@ -218,7 +218,7 @@ jobs:
     needs: prepare_metadata
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ needs.prepare_metadata.outputs.release_branch }}
 
@@ -261,7 +261,7 @@ jobs:
     # (Debian 11 / Ubuntu 20.04 + etc.).
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ needs.prepare_metadata.outputs.release_branch }}
 
