@@ -101,7 +101,7 @@ jobs:
       # The range argument `<prev>..HEAD` is injected via a ternary expression: with prev it limits the range, without prev
       # git-cliff outputs the full history (first release).
       - name: Generate release notes via git-cliff
-        uses: orhun/git-cliff-action@98c93442bb05a455a77bee982867857ae748eeea # v4.5.1
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4.9.1
         with:
           config: cliff.toml
           args: >-
