@@ -47,7 +47,11 @@ fn args(req: &TurnRequest) -> Vec<String> {
     ]
     .map(String::from)
     .into();
-    a.push(if req.resume { "--resume" } else { "--session-id" }.into());
+    // The CLI keys saved sessions by working directory, so a conversation reopened from
+    // elsewhere cannot be resumed; start it fresh under the same id instead of failing.
+    let resume = req.resume && session_exists(req.cwd.as_deref(), &req.session_id);
+    a.extend(["--append-system-prompt".into(), super::style::GUIDANCE.into()]);
+    a.push(if resume { "--resume" } else { "--session-id" }.into());
     a.push(req.session_id.clone());
     if let Some(model) = &req.model {
         a.extend(["--model".into(), model.clone()]);
@@ -87,9 +91,13 @@ fn parse_line(line: &str) -> Vec<AgentEvent> {
             })
             .collect(),
         Some("result") if v["is_error"].as_bool().unwrap_or(false) => {
-            vec![AgentEvent::Error(v["result"].as_str().unwrap_or("Claude Code failed").into())]
+            vec![AgentEvent::Error(failure_text(&v))]
         }
-        Some("result") => vec![AgentEvent::Done],
+        Some("result") => {
+            let mut ev: Vec<AgentEvent> = usage_line(&v).into_iter().map(AgentEvent::Usage).collect();
+            ev.push(AgentEvent::Done);
+            ev
+        }
         _ => vec![],
     }
 }
@@ -100,6 +108,50 @@ fn text(s: Option<&str>, make: fn(String) -> AgentEvent) -> Vec<AgentEvent> {
 
 fn blocks(v: &Value) -> impl Iterator<Item = &Value> {
     v["message"]["content"].as_array().into_iter().flatten()
+}
+
+/// Whether the CLI has a saved session `id` for `cwd` (`~/.claude/projects/<cwd>/<id>.jsonl`).
+fn session_exists(cwd: Option<&std::path::Path>, id: &str) -> bool {
+    let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) else {
+        return true; // cannot tell; let the CLI decide
+    };
+    let cwd = cwd.map(Into::into).or_else(|| std::env::current_dir().ok()).unwrap_or_default();
+    std::path::Path::new(&home)
+        .join(".claude/projects")
+        .join(project_dir_name(&cwd.to_string_lossy()))
+        .join(format!("{id}.jsonl"))
+        .is_file()
+}
+
+/// The CLI's project folder name: every non-alphanumeric character becomes `-`.
+fn project_dir_name(cwd: &str) -> String {
+    cwd.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect()
+}
+
+/// `12.4s · 1.1k tokens out · $0.86` from the final `result` event; parts that are missing are skipped.
+fn usage_line(v: &Value) -> Option<String> {
+    let mut parts = vec![];
+    if let Some(ms) = v["duration_ms"].as_f64() {
+        parts.push(format!("{:.1}s", ms / 1000.0));
+    }
+    if let Some(t) = v["usage"]["output_tokens"].as_u64() {
+        parts.push(if t >= 1000 { format!("{:.1}k tokens out", t as f64 / 1000.0) } else { format!("{t} tokens out") });
+    }
+    if let Some(c) = v["total_cost_usd"].as_f64() {
+        parts.push(format!("${c:.2}"));
+    }
+    (!parts.is_empty()).then(|| parts.join(" · "))
+}
+
+/// Why a turn failed: the CLI's message when it has one, else its subtype and error list.
+fn failure_text(v: &Value) -> String {
+    if let Some(s) = v["result"].as_str().filter(|s| !s.is_empty()) {
+        return s.into();
+    }
+    let errors = v["errors"].as_array().into_iter().flatten().filter_map(Value::as_str);
+    let detail = errors.collect::<Vec<_>>().join("; ");
+    let subtype = v["subtype"].as_str().unwrap_or("error");
+    if detail.is_empty() { format!("Claude Code failed ({subtype})") } else { format!("Claude Code failed ({subtype}): {detail}") }
 }
 
 /// A tool result's `content` is either a string or a list of `{type:"text", text}` blocks.

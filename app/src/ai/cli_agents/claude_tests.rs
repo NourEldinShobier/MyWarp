@@ -31,6 +31,10 @@ fn tool_result_and_turn_end() {
     );
     assert_eq!(parse_line(r#"{"type":"result","is_error":false,"result":"ok"}"#), vec![AgentEvent::Done]);
     assert_eq!(
+        parse_line(r#"{"type":"result","is_error":false,"duration_ms":12400,"usage":{"output_tokens":1084},"total_cost_usd":0.8625}"#),
+        vec![AgentEvent::Usage("12.4s · 1.1k tokens out · $0.86".into()), AgentEvent::Done]
+    );
+    assert_eq!(
         parse_line(r#"{"type":"result","is_error":true,"result":"boom"}"#),
         vec![AgentEvent::Error("boom".into())]
     );
@@ -43,6 +47,12 @@ fn noise_is_ignored() {
 }
 
 #[test]
+fn project_dir_matches_cli_naming() {
+    assert_eq!(project_dir_name(r"D:\workspaces\warp-terminal\code\warp"), "D--workspaces-warp-terminal-code-warp");
+    assert_eq!(project_dir_name(r"C:\Users\noure"), "C--Users-noure");
+}
+
+#[test]
 fn args_resume_vs_new_session_and_model() {
     let req = |resume, model: Option<&str>| TurnRequest {
         prompt: "p".into(), cwd: None, model: model.map(Into::into), session_id: "sid".into(), resume,
@@ -51,6 +61,7 @@ fn args_resume_vs_new_session_and_model() {
     assert!(a.windows(2).any(|w| w == ["--session-id", "sid"]));
     assert!(!a.contains(&"--model".to_string()));
     let a = args(&req(true, Some("opus")));
-    assert!(a.windows(2).any(|w| w == ["--resume", "sid"]));
+    // No saved session named "sid" exists, so resume falls back to a fresh one with that id.
+    assert!(a.windows(2).any(|w| w == ["--session-id", "sid"]));
     assert!(a.windows(2).any(|w| w == ["--model", "opus"]));
 }

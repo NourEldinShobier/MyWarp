@@ -3241,6 +3241,23 @@ impl Input {
         input.update_voice_transcription_options(ctx);
         input.update_image_context_options(ctx);
         input.update_ai_context_menu(ctx);
+
+        // Dev-only UI test hook: submit one agent prompt a few seconds after launch.
+        if let Ok(prompt) = std::env::var("WARP_DEV_AUTOPROMPT") {
+            static FIRED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+            if !FIRED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                let _ = ctx.spawn(
+                    async move {
+                        warpui::r#async::Timer::after(Duration::from_secs(8)).await;
+                        prompt
+                    },
+                    |input, prompt, ctx| {
+                        input.editor.update(ctx, |editor, ctx| editor.set_buffer_text(&prompt, ctx));
+                        input.submit_ai_query(None, ctx);
+                    },
+                );
+            }
+        }
         input
     }
 

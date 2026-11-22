@@ -12,6 +12,7 @@ use futures::stream::BoxStream;
 pub(crate) mod claude;
 pub(crate) mod runner;
 pub(crate) mod stream;
+pub(crate) mod style;
 
 /// Prefix of tool-call ids that Warp only displays. The CLI already ran those tools, so the
 /// action model must not execute them again.
@@ -34,6 +35,18 @@ pub(crate) fn record_outcome(outcome: ToolOutcome) {
 
 pub(crate) fn drain_outcomes() -> Vec<ToolOutcome> {
     std::mem::take(&mut *OUTCOMES.lock().unwrap())
+}
+
+/// Card title for a displayed tool: `Bash · ls -la`. No `(` so the card keeps the whole title
+/// (the card treats the first `(` as the start of the arguments).
+pub(crate) fn tool_title(name: &str, input: &serde_json::Value) -> String {
+    let pick = ["command", "pattern", "query", "url", "file_path", "path", "description"]
+        .iter()
+        .find_map(|k| input[*k].as_str());
+    let s = pick.or_else(|| input.as_object()?.values().find_map(serde_json::Value::as_str));
+    let s = s.and_then(|s| s.lines().next()).unwrap_or("");
+    let s: String = s.chars().take(100).collect::<String>().replace('(', "[").replace(')', "]");
+    if s.is_empty() { name.to_owned() } else { format!("{name} · {s}") }
 }
 
 pub(crate) fn is_display_only(tool_call_id: &str) -> bool {
@@ -75,6 +88,8 @@ pub(crate) enum AgentEvent {
     ToolStarted { id: String, name: String, input: serde_json::Value },
     /// A tool finished. `is_error` marks failures; `output` is the tool's result text.
     ToolFinished { id: String, is_error: bool, output: String },
+    /// One-line turn summary (duration, tokens, cost) shown under the answer.
+    Usage(String),
     /// The turn ended normally.
     Done,
     /// The turn failed; the message is shown to the user.

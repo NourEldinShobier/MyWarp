@@ -29,6 +29,13 @@ pub(crate) fn run_lines(
     if let Some(cwd) = cwd {
         cmd.current_dir(cwd);
     }
+    // Headless: no console window flashes up for the child (Windows only).
+    #[cfg(windows)]
+    {
+        use async_process::windows::CommandExt as _;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
     let program = program.to_owned();
 
     Box::pin(async_stream::stream! {

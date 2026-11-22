@@ -1092,7 +1092,13 @@ impl RequestedCommandView {
                 };
             }
             None => {
-                if self.block_model.status(app).is_streaming() {
+                if self.block_model.status(app).is_streaming()
+                    && crate::ai::cli_agents::is_display_only(&self.action_id.to_string())
+                {
+                    // A tool an external CLI agent is running right now: say what, not "Generating".
+                    title = format!("Running {}", self.get_header_title_text()).into();
+                    font_override = Some(appearance.monospace_font_family());
+                } else if self.block_model.status(app).is_streaming() {
                     title = LOADING_MESSAGE.into();
 
                     if !self

@@ -1821,7 +1821,10 @@ impl AIConversation {
                 .map(Shared::get_owned);
             if let Some(output_shared) = output {
                 let output = output_shared.get();
-                has_new_actions |= output.actions().next().is_some();
+                // Tools an external CLI agent already ran never wait on the action queue.
+                has_new_actions |= output
+                    .actions()
+                    .any(|a| !crate::ai::cli_agents::is_display_only(&a.id.to_string()));
 
                 if let Some(new_suggestions) = output.suggestions.clone() {
                     if let Some(existing_suggestions) = self.existing_suggestions.as_mut() {

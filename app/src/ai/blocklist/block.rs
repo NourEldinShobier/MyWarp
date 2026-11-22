@@ -1790,7 +1790,10 @@ impl AIBlock {
                         }
                         other => other.clone(),
                     };
-                    let command_text = if display_input.is_null() {
+                    let command_text = if crate::ai::cli_agents::is_display_only(&action_id.to_string()) {
+                        let title = crate::ai::cli_agents::tool_title(name, &display_input);
+                        format!("{title} ({display_input})")
+                    } else if display_input.is_null() {
                         format!("MCP Tool: {name}")
                     } else {
                         format!("MCP Tool: {name} ({display_input})")
