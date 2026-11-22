@@ -11,6 +11,7 @@ use futures::stream::BoxStream;
 
 pub(crate) mod claude;
 pub(crate) mod commands;
+pub(crate) mod permissions;
 pub(crate) mod runner;
 pub(crate) mod stream;
 pub(crate) mod style;
@@ -89,6 +90,8 @@ pub(crate) enum AgentEvent {
     ToolStarted { id: String, name: String, input: serde_json::Value },
     /// A tool finished. `is_error` marks failures; `output` is the tool's result text.
     ToolFinished { id: String, is_error: bool, output: String },
+    /// The CLI paused on a tool that needs the user's approval.
+    PermissionRequest { tool_use_id: String, request_id: String, tool_name: String, input: serde_json::Value },
     /// Slash commands, skills and plugin commands the CLI offers (from its `init` event).
     Commands(Vec<commands::CliCommand>),
     /// One-line turn summary (duration, tokens, cost) shown under the answer.

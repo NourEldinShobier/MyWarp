@@ -27,7 +27,22 @@ impl AgentBackend for ClaudeCode {
             "message": { "role": "user", "content": req.prompt },
         })
         .to_string();
-        runner::run_lines(self.binary(), args(&req), req.cwd.as_deref(), stdin, parse_line)
+        runner::run_lines(
+            self.binary(),
+            args(&req),
+            req.cwd.as_deref(),
+            stdin,
+            super::permissions::interactive(),
+            |line, to_stdin| {
+                let events = parse_line(line);
+                for ev in &events {
+                    if let AgentEvent::PermissionRequest { tool_use_id, request_id, input, .. } = ev {
+                        super::permissions::register(tool_use_id, request_id.clone(), input.clone(), to_stdin.clone());
+                    }
+                }
+                events
+            },
+        )
     }
 }
 
@@ -53,6 +68,9 @@ fn args(req: &TurnRequest) -> Vec<String> {
     // rules in your Claude settings still apply on top.
     let mode = std::env::var("WARP_CLAUDE_PERMISSION_MODE").unwrap_or_else(|_| "acceptEdits".into());
     a.extend(["--permission-mode".into(), mode]);
+    if super::permissions::interactive() {
+        a.extend(["--permission-prompt-tool".into(), "stdio".into()]);
+    }
     a.push(if resume { "--resume" } else { "--session-id" }.into());
     a.push(req.session_id.clone());
     if let Some(model) = &req.model {
@@ -70,6 +88,15 @@ fn parse_line(line: &str) -> Vec<AgentEvent> {
         return vec![AgentEvent::Commands(names)];
     }
     match v["type"].as_str() {
+        Some("control_request") if v["request"]["subtype"] == "can_use_tool" => {
+            let r = &v["request"];
+            vec![AgentEvent::PermissionRequest {
+                tool_use_id: r["tool_use_id"].as_str().unwrap_or_default().into(),
+                request_id: v["request_id"].as_str().unwrap_or_default().into(),
+                tool_name: r["tool_name"].as_str().unwrap_or("tool").into(),
+                input: r["input"].clone(),
+            }]
+        }
         Some("stream_event") => {
             let delta = &v["event"]["delta"];
             match delta["type"].as_str() {

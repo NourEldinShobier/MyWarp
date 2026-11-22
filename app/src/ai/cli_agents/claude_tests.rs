@@ -72,3 +72,17 @@ fn args_resume_vs_new_session_and_model() {
     assert!(a.windows(2).any(|w| w == ["--session-id", "sid"]));
     assert!(a.windows(2).any(|w| w == ["--model", "opus"]));
 }
+
+#[test]
+fn permission_request_is_parsed() {
+    let l = r#"{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"touch x"},"tool_use_id":"t7"}}"#;
+    assert_eq!(
+        parse_line(l),
+        vec![AgentEvent::PermissionRequest {
+            tool_use_id: "t7".into(),
+            request_id: "r1".into(),
+            tool_name: "Bash".into(),
+            input: serde_json::json!({"command": "touch x"}),
+        }]
+    );
+}

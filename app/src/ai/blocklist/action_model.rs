@@ -622,6 +622,10 @@ impl BlocklistAIActionModel {
 
     /// Returns the `AIActionStatus` for the action corresponding to the given `id`, if any.
     pub fn get_action_status(&self, id: &AIAgentActionId) -> Option<AIActionStatus> {
+        // A tool the CLI agent paused on, waiting for Approve / Reject.
+        if crate::ai::cli_agents::permissions::is_awaiting(&id.to_string()) {
+            return Some(AIActionStatus::Blocked);
+        }
         for (conversation_id, pending_actions_for_conversation) in &self.pending_actions {
             for (index, action) in pending_actions_for_conversation.iter().enumerate() {
                 if &action.id != id {
@@ -746,6 +750,10 @@ impl BlocklistAIActionModel {
         conversation_id: AIConversationId,
         ctx: &mut ModelContext<Self>,
     ) {
+        if crate::ai::cli_agents::permissions::respond(&action_id.to_string(), true) {
+            ctx.notify();
+            return;
+        }
         if self
             .start_pending_action_by_id(action_id, conversation_id, true, ctx)
             .is_some_and(|result| matches!(result, StartedAction::Sync))
@@ -1067,6 +1075,10 @@ impl BlocklistAIActionModel {
         reason: CancellationReason,
         ctx: &mut ModelContext<Self>,
     ) {
+        if crate::ai::cli_agents::permissions::respond(&action_id.to_string(), false) {
+            ctx.notify();
+            return;
+        }
         if self
             .running_actions
             .get(&conversation_id)

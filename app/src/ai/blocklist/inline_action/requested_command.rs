@@ -1053,6 +1053,11 @@ impl RequestedCommandView {
             Some(AIActionStatus::Blocked) => {
                 title = match &self.action_type {
                     RequestedActionViewType::Command => COMMAND_WAITING_FOR_USER_MESSAGE.into(),
+                    RequestedActionViewType::McpTool
+                        if crate::ai::cli_agents::is_display_only(&self.action_id.to_string()) =>
+                    {
+                        "OK if Claude Code runs this tool?".into()
+                    }
                     RequestedActionViewType::McpTool => MCP_TOOL_WAITING_FOR_USER_MESSAGE.into(),
                 };
             }

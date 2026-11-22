@@ -197,6 +197,12 @@ pub(crate) fn generate_cli_output(input: CliTurnInput) -> ResponseStream {
                         output,
                     });
                 }
+                AgentEvent::PermissionRequest { tool_name, input, .. } => {
+                    open = Open::None;
+                    let note = format!("*Waiting for your approval: {}*", super::tool_title(&tool_name, &input));
+                    let msg = make_agent_output_message(&task_id, &request_id, note);
+                    yield Ok(make_add_messages_event(&task_id, vec![msg]));
+                }
                 AgentEvent::Commands(names) => super::commands::set_if_empty(names),
                 AgentEvent::Usage { line, cost_usd } => {
                     open = Open::None;
@@ -215,6 +221,7 @@ pub(crate) fn generate_cli_output(input: CliTurnInput) -> ResponseStream {
             }
             }
         }
+        super::permissions::clear();
         match failed {
             Some(e) => yield Err(Arc::new(AIApiError::Other(anyhow::anyhow!(e)))),
             None => yield Ok(make_finished_done(None)),

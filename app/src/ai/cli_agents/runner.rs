@@ -6,7 +6,7 @@ use std::process::Stdio;
 use async_process::Command;
 use futures::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use futures::stream::BoxStream;
-use futures::StreamExt as _;
+use futures::{FutureExt as _, StreamExt as _};
 
 use super::AgentEvent;
 
@@ -18,7 +18,8 @@ pub(crate) fn run_lines(
     args: Vec<String>,
     cwd: Option<&Path>,
     stdin_line: String,
-    mut parse: impl FnMut(&str) -> Vec<AgentEvent> + Send + 'static,
+    keep_stdin_open: bool,
+    mut parse: impl FnMut(&str, &futures::channel::mpsc::UnboundedSender<String>) -> Vec<AgentEvent> + Send + 'static,
 ) -> BoxStream<'static, AgentEvent> {
     let mut cmd = Command::new(program);
     cmd.args(args)
@@ -46,7 +47,8 @@ pub(crate) fn run_lines(
                 return;
             }
         };
-        if let Some(mut stdin) = child.stdin.take() {
+        let mut stdin = child.stdin.take();
+        if let Some(stdin) = stdin.as_mut() {
             let write = async {
                 stdin.write_all(stdin_line.as_bytes()).await?;
                 stdin.write_all(b"\n").await?;
@@ -56,16 +58,35 @@ pub(crate) fn run_lines(
                 yield AgentEvent::Error(format!("Could not send the prompt to `{program}`: {e}"));
                 return;
             }
-            // Dropping stdin closes it, which lets one-shot CLIs finish after the turn.
-            drop(stdin);
         }
+        // Closing stdin lets one-shot CLIs finish after the turn. It stays open while the CLI may
+        // still ask for permission answers, and closes once the turn's result is in.
+        if !keep_stdin_open {
+            stdin = None;
+        }
+        let (to_stdin, mut from_parser) = futures::channel::mpsc::unbounded::<String>();
         let stderr = child.stderr.take();
         let mut lines = BufReader::new(child.stdout.take().expect("piped")).lines();
         let mut finished = false;
-        while let Some(Ok(line)) = lines.next().await {
-            for ev in parse(&line) {
-                finished |= matches!(ev, AgentEvent::Done | AgentEvent::Error(_));
-                yield ev;
+        loop {
+            futures::select! {
+                line = lines.next().fuse() => {
+                    let Some(Ok(line)) = line else { break };
+                    for ev in parse(&line, &to_stdin) {
+                        finished |= matches!(ev, AgentEvent::Done | AgentEvent::Error(_));
+                        yield ev;
+                    }
+                    if finished {
+                        stdin = None;
+                    }
+                }
+                msg = from_parser.next() => {
+                    if let (Some(msg), Some(stdin)) = (msg, stdin.as_mut()) {
+                        let _ = stdin.write_all(msg.as_bytes()).await;
+                        let _ = stdin.write_all(b"\n").await;
+                        let _ = stdin.flush().await;
+                    }
+                }
             }
         }
         if !finished {
