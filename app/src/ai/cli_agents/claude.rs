@@ -40,17 +40,19 @@ fn args(req: &TurnRequest) -> Vec<String> {
         "stream-json",
         "--include-partial-messages",
         "--verbose",
-        // Headless runs cannot answer permission prompts; edits are allowed, other
-        // tools the user has not pre-approved are denied by the CLI.
-        "--permission-mode",
-        "acceptEdits",
     ]
     .map(String::from)
     .into();
     // The CLI keys saved sessions by working directory, so a conversation reopened from
     // elsewhere cannot be resumed; start it fresh under the same id instead of failing.
     let resume = req.resume && session_exists(req.cwd.as_deref(), &req.session_id);
-    a.extend(["--append-system-prompt".into(), super::style::GUIDANCE.into()]);
+    if super::style::enabled() {
+        a.extend(["--append-system-prompt".into(), super::style::GUIDANCE.into()]);
+    }
+    // How tools needing approval are handled in this headless run. The CLI's own allow
+    // rules in your Claude settings still apply on top.
+    let mode = std::env::var("WARP_CLAUDE_PERMISSION_MODE").unwrap_or_else(|_| "acceptEdits".into());
+    a.extend(["--permission-mode".into(), mode]);
     a.push(if resume { "--resume" } else { "--session-id" }.into());
     a.push(req.session_id.clone());
     if let Some(model) = &req.model {
@@ -64,6 +66,9 @@ fn parse_line(line: &str) -> Vec<AgentEvent> {
     let Ok(v) = serde_json::from_str::<Value>(line) else {
         return vec![];
     };
+    if let Some(names) = super::commands::from_init_line(&v) {
+        return vec![AgentEvent::Commands(names)];
+    }
     match v["type"].as_str() {
         Some("stream_event") => {
             let delta = &v["event"]["delta"];
@@ -94,7 +99,10 @@ fn parse_line(line: &str) -> Vec<AgentEvent> {
             vec![AgentEvent::Error(failure_text(&v))]
         }
         Some("result") => {
-            let mut ev: Vec<AgentEvent> = usage_line(&v).into_iter().map(AgentEvent::Usage).collect();
+            let mut ev: Vec<AgentEvent> = usage_line(&v)
+                .into_iter()
+                .map(|line| AgentEvent::Usage { line, cost_usd: v["total_cost_usd"].as_f64() })
+                .collect();
             ev.push(AgentEvent::Done);
             ev
         }

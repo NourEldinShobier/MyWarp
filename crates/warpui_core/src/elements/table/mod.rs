@@ -10,7 +10,7 @@ use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 
 use crate::event::DispatchedEvent;
-use crate::scene::ClipBounds;
+use crate::scene::{Border, ClipBounds, CornerRadius, Radius};
 use crate::text::word_boundaries::WordBoundariesPolicy;
 use crate::text::{IsRect, SelectionDirection, SelectionType};
 use crate::units::{IntoPixels, Pixels};
@@ -31,6 +31,9 @@ use sum_tree::SumTree;
 
 /// Default estimated row height used when no rows have been measured yet.
 const DEFAULT_ROW_HEIGHT_ESTIMATE: f32 = 32.0;
+
+/// Default radius of the table's outer corners in pixels.
+const DEFAULT_CORNER_RADIUS: f32 = 6.0;
 
 /// Callback type for rendering a single row on demand.
 /// Takes the row index and returns a vector of cell elements for that row.
@@ -544,6 +547,8 @@ pub struct Table {
     state: TableStateHandle,
     headers: Vec<TableHeader>,
     config: TableConfig,
+    /// Radius in pixels of the table's outer corners (header top, last row bottom, border).
+    corner_radius: f32,
     /// Width to use when the table has unconstrained width and no intrinsic content to measure.
     unconstrained_width: f32,
     /// Viewport height to use when height constraint is not finite.
@@ -571,6 +576,7 @@ impl Table {
             state,
             headers: Vec::new(),
             config: TableConfig::default(),
+            corner_radius: DEFAULT_CORNER_RADIUS,
             unconstrained_width,
             unconstrained_height,
             size: None,
@@ -604,6 +610,12 @@ impl Table {
 
     pub fn with_config(mut self, config: TableConfig) -> Self {
         self.config = config;
+        self
+    }
+
+    /// Set the radius of the table's outer corners in pixels (default 6.0).
+    pub fn with_corner_radius(mut self, radius: f32) -> Self {
+        self.corner_radius = radius;
         self
     }
 
@@ -1210,6 +1222,14 @@ impl Element for Table {
             (header_origin, content_origin, header_visible, clip)
         };
 
+        let radius = Radius::Pixels(self.corner_radius);
+        // A table without body rows rounds the header's bottom corners too.
+        let header_corners = if total_row_count == 0 {
+            CornerRadius::with_all(radius)
+        } else {
+            CornerRadius::with_top(radius)
+        };
+
         // Start clipping layer for body content
         ctx.scene
             .start_layer(ClipBounds::BoundedByActiveLayerAnd(body_clip_rect));
@@ -1219,7 +1239,8 @@ impl Element for Table {
             let header_rect = RectF::new(header_origin, vec2f(total_width, header_height.as_f32()));
             ctx.scene
                 .draw_rect_with_hit_recording(header_rect)
-                .with_background(self.config.header_background);
+                .with_background(self.config.header_background)
+                .with_corner_radius(header_corners);
 
             for (col_idx, header) in self.headers.iter_mut().enumerate() {
                 let col_left = column_lefts.get(col_idx).copied().unwrap_or(0.0);
@@ -1262,9 +1283,15 @@ impl Element for Table {
                 content_origin + vec2f(0.0, current_y),
                 vec2f(total_width, row_height_f32),
             );
+            let row_corners = if absolute_row_idx + 1 == total_row_count {
+                CornerRadius::with_bottom(radius)
+            } else {
+                CornerRadius::default()
+            };
             ctx.scene
                 .draw_rect_with_hit_recording(row_rect)
-                .with_background(bg_color);
+                .with_background(bg_color)
+                .with_corner_radius(row_corners);
 
             for (col_idx, cell) in row_elements.iter_mut().enumerate() {
                 let col_left = column_lefts.get(col_idx).copied().unwrap_or(0.0);
@@ -1298,7 +1325,8 @@ impl Element for Table {
             let header_rect = RectF::new(header_origin, vec2f(total_width, header_height.as_f32()));
             ctx.scene
                 .draw_rect_with_hit_recording(header_rect)
-                .with_background(self.config.header_background);
+                .with_background(self.config.header_background)
+                .with_corner_radius(header_corners);
 
             for (col_idx, header) in self.headers.iter_mut().enumerate() {
                 let col_left = column_lefts.get(col_idx).copied().unwrap_or(0.0);
@@ -1327,7 +1355,6 @@ impl Element for Table {
             let top_y = Self::snap_to_pixel(origin.y());
             let bottom_y = Self::snap_to_pixel(origin.y() + border_height - bw);
             let left_x = Self::snap_to_pixel(origin.x());
-            let right_x = Self::snap_to_pixel(origin.x() + total_width - bw);
             let inner_top_y = top_y + bw;
             let inner_height = (bottom_y - inner_top_y).max(0.0);
 
@@ -1348,30 +1375,22 @@ impl Element for Table {
             }
 
             if self.config.outer_border {
+                // One rounded, unfilled outline drawn over the fills and dividers.
                 ctx.scene
                     .draw_rect_with_hit_recording(RectF::new(
                         vec2f(left_x, top_y),
-                        vec2f(total_width, bw),
+                        vec2f(total_width, border_height),
                     ))
-                    .with_background(border_color);
-                ctx.scene
-                    .draw_rect_with_hit_recording(RectF::new(
-                        vec2f(left_x, bottom_y),
-                        vec2f(total_width, bw),
-                    ))
-                    .with_background(border_color);
-                ctx.scene
-                    .draw_rect_with_hit_recording(RectF::new(
-                        vec2f(left_x, top_y),
-                        vec2f(bw, border_height),
-                    ))
-                    .with_background(border_color);
-                ctx.scene
-                    .draw_rect_with_hit_recording(RectF::new(
-                        vec2f(right_x, top_y),
-                        vec2f(bw, border_height),
-                    ))
-                    .with_background(border_color);
+                    .with_corner_radius(CornerRadius::with_all(radius))
+                    .with_border(Border {
+                        width: bw,
+                        color: border_color.into(),
+                        top: true,
+                        left: true,
+                        bottom: true,
+                        right: true,
+                        dash: None,
+                    });
             }
         }
     }

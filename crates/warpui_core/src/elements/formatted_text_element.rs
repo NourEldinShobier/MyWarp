@@ -1815,6 +1815,13 @@ impl Element for FormattedTextElement {
                             if let Some(bg_color) = self.inline_code_bg_color {
                                 if text_style.background_color.is_none() {
                                     text_style.background_color = Some(bg_color);
+                                    // Rounded chip with a little padding, like inline code in the editor.
+                                    text_style = text_style.with_border(crate::text_layout::TextBorder {
+                                        color: bg_color,
+                                        radius: 4,
+                                        width: 1,
+                                        line_height_ratio_override: Some(120),
+                                    });
                                 }
                             }
                         }

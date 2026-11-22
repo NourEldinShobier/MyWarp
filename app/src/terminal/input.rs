@@ -3242,6 +3242,9 @@ impl Input {
         input.update_image_context_options(ctx);
         input.update_ai_context_menu(ctx);
 
+        // Warm the Claude Code command list (runs once, in the background) so the `/` menu has it.
+        let _ = crate::ai::cli_agents::commands::list();
+
         // Dev-only UI test hook: submit one agent prompt a few seconds after launch.
         if let Ok(prompt) = std::env::var("WARP_DEV_AUTOPROMPT") {
             static FIRED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -3253,7 +3256,9 @@ impl Input {
                     },
                     |input, prompt, ctx| {
                         input.editor.update(ctx, |editor, ctx| editor.set_buffer_text(&prompt, ctx));
-                        input.submit_ai_query(None, ctx);
+                        if std::env::var_os("WARP_DEV_NO_SUBMIT").is_none() {
+                            input.submit_ai_query(None, ctx);
+                        }
                     },
                 );
             }

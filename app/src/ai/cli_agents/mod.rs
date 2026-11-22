@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use futures::stream::BoxStream;
 
 pub(crate) mod claude;
+pub(crate) mod commands;
 pub(crate) mod runner;
 pub(crate) mod stream;
 pub(crate) mod style;
@@ -88,8 +89,10 @@ pub(crate) enum AgentEvent {
     ToolStarted { id: String, name: String, input: serde_json::Value },
     /// A tool finished. `is_error` marks failures; `output` is the tool's result text.
     ToolFinished { id: String, is_error: bool, output: String },
+    /// Slash commands, skills and plugin commands the CLI offers (from its `init` event).
+    Commands(Vec<commands::CliCommand>),
     /// One-line turn summary (duration, tokens, cost) shown under the answer.
-    Usage(String),
+    Usage { line: String, cost_usd: Option<f64> },
     /// The turn ended normally.
     Done,
     /// The turn failed; the message is shown to the user.

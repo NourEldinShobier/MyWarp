@@ -32,7 +32,10 @@ fn tool_result_and_turn_end() {
     assert_eq!(parse_line(r#"{"type":"result","is_error":false,"result":"ok"}"#), vec![AgentEvent::Done]);
     assert_eq!(
         parse_line(r#"{"type":"result","is_error":false,"duration_ms":12400,"usage":{"output_tokens":1084},"total_cost_usd":0.8625}"#),
-        vec![AgentEvent::Usage("12.4s · 1.1k tokens out · $0.86".into()), AgentEvent::Done]
+        vec![
+            AgentEvent::Usage { line: "12.4s · 1.1k tokens out · $0.86".into(), cost_usd: Some(0.8625) },
+            AgentEvent::Done
+        ]
     );
     assert_eq!(
         parse_line(r#"{"type":"result","is_error":true,"result":"boom"}"#),
@@ -43,7 +46,11 @@ fn tool_result_and_turn_end() {
 #[test]
 fn noise_is_ignored() {
     assert!(parse_line("not json").is_empty());
-    assert!(parse_line(r#"{"type":"system","subtype":"init"}"#).is_empty());
+    assert!(parse_line(r#"{"type":"system","subtype":"hook_started"}"#).is_empty());
+    assert_eq!(
+        parse_line(r#"{"type":"system","subtype":"init","slash_commands":["compact"]}"#),
+        vec![AgentEvent::Commands(vec![crate::ai::cli_agents::commands::CliCommand { name: "compact".into(), description: None }])]
+    );
 }
 
 #[test]

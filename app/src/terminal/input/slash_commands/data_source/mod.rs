@@ -298,6 +298,7 @@ impl SyncDataSource for SlashCommandDataSource {
             }
         }
 
+        let mut listed: std::collections::HashSet<String> = Default::default();
         // Also search skills — when CLI agent input is open, filter to natively supported providers.
         // Skills are invoked by the agent, so they're hidden entirely when AI is globally off.
         if FeatureFlag::ListSkills.is_enabled() && AISettings::as_ref(app).is_any_ai_enabled(app) {
@@ -309,6 +310,7 @@ impl SyncDataSource for SlashCommandDataSource {
                 .get_skills_for_working_directory(cwd_path, app);
 
             let skill_manager = SkillManager::as_ref(app);
+            listed.extend(skills.iter().map(|s| s.name.to_lowercase()));
             for mut skill in skills {
                 // In CLI agent input mode, only show skills that exist in a supported
                 // provider folder. We check all paths (not just the deduplicated
@@ -344,6 +346,35 @@ impl SyncDataSource for SlashCommandDataSource {
                                 OrderedFloat(score) * SCORE_MULTIPLIER
                                     + OrderedFloat(prefix_boost) * SCORE_MULTIPLIER
                                     + OrderedFloat(1. / skill.name.len() as f64),
+                            ),
+                    ));
+                }
+            }
+        }
+
+        // Commands, skills and plugin commands the Claude Code CLI offers (not already listed above).
+        if AISettings::as_ref(app).is_any_ai_enabled(app) && self.is_agent_view_active(app) {
+            for command in crate::ai::cli_agents::commands::list() {
+                let name = command.name;
+                if !listed.insert(name.to_lowercase()) {
+                    continue;
+                }
+                if let Some(fuzzy_result) =
+                    SlashCommandFuzzyMatchResult::try_match(&query_text, &name, None)
+                {
+                    let score = fuzzy_result.score();
+                    if query_text.len() > 1 && score <= 25.0 {
+                        continue;
+                    }
+                    let prefix_boost = prefix_match_bonus(&query_text, &name);
+                    results.push(QueryResult::from(
+                        InlineItem::from_cli_command(&name, command.description, app)
+                            .with_name_match_result(fuzzy_result.name_match_result)
+                            .with_description_match_result(fuzzy_result.description_match_result)
+                            .with_score(
+                                OrderedFloat(score) * SCORE_MULTIPLIER
+                                    + OrderedFloat(prefix_boost) * SCORE_MULTIPLIER
+                                    + OrderedFloat(1. / name.len() as f64),
                             ),
                     ));
                 }
@@ -404,6 +435,25 @@ impl InlineItem {
             icon_path: command.icon_path,
             name: command.name.to_owned(),
             description: Some(command.description.to_owned()),
+            font_family: appearance.monospace_font_family(),
+            name_match_result: None,
+            description_match_result: None,
+            score: OrderedFloat(f64::MIN),
+        }
+    }
+
+    /// A command offered by the Claude Code CLI. Selecting it types `/name ` into the input,
+    /// and sending that text runs it in the CLI.
+    fn from_cli_command(name: &str, description: Option<String>, app: &AppContext) -> Self {
+        let appearance = Appearance::handle(app).as_ref(app);
+        Self {
+            action: AcceptSlashCommandOrSavedPrompt::Skill {
+                reference: ai::skills::SkillReference::Path(PathBuf::new()),
+                name: name.to_owned(),
+            },
+            icon_path: WarpIcon::ClaudeLogo.into(),
+            name: format!("/{name}"),
+            description: Some(description.unwrap_or_else(|| "Claude Code command".to_owned())),
             font_family: appearance.monospace_font_family(),
             name_match_result: None,
             description_match_result: None,

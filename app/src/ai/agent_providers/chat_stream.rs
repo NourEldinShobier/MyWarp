@@ -4795,7 +4795,7 @@ pub(crate) fn make_add_messages_event(task_id: &str, messages: Vec<api::Message>
 /// `conversation::Action::UpdateTaskMessage` → `task::upsert_message` →
 /// `FieldMaskOperation::update` 原地合并,id 已存在则不会 push 重复记录。
 /// 用于 BYOP web 工具 loading → success/error 状态切换(见拦截分支)。
-fn make_update_message_event(
+pub(crate) fn make_update_message_event(
     task_id: &str,
     message: api::Message,
     mask_paths: Vec<String>,
@@ -5044,7 +5044,7 @@ pub(crate) fn make_user_query_message(
 
 /// BYOP 拦截 websearch 时,emit `Message::WebSearch(Searching{query})`,UI 据此渲染
 /// "Searching the web for \"query\"" loading 卡(`inline_action::web_search`)。
-fn make_web_search_searching_message(
+pub(crate) fn make_web_search_searching_message(
     task_id: &str,
     request_id: &str,
     query: String,
@@ -5133,7 +5133,7 @@ fn extract_search_pages_from_exa_results(s: &str) -> Vec<(String, String)> {
 /// BYOP websearch 完成后,根据 `result_json` 决定 Success / Error 状态。
 ///
 /// `pages` 从 `result_json["results"]` 这段 exa 拼好的 markdown 里扫 `[title](url)` 抽。
-fn make_web_search_status_from_result(
+pub(crate) fn make_web_search_status_from_result(
     task_id: &str,
     request_id: &str,
     query: &str,
@@ -5178,7 +5178,7 @@ fn make_web_search_status_from_result(
 
 /// BYOP 拦截 webfetch 时,emit `Message::WebFetch(Fetching{urls})`,UI 据此渲染
 /// "Fetching N URLs" loading 卡(`inline_action::web_fetch`)。
-fn make_web_fetch_fetching_message(
+pub(crate) fn make_web_fetch_fetching_message(
     task_id: &str,
     request_id: &str,
     urls: Vec<String>,
@@ -5202,7 +5202,7 @@ fn make_web_fetch_fetching_message(
 
 /// BYOP webfetch 完成后,从 `FetchOutput` JSON 抽 `url` + HTTP `status` 组装 Success
 /// 卡;status="error" 走 Error 卡。
-fn make_web_fetch_status_from_result(
+pub(crate) fn make_web_fetch_status_from_result(
     task_id: &str,
     request_id: &str,
     fallback_urls: &[String],

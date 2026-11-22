@@ -22,3 +22,12 @@ fn fences_are_skipped_and_chunks_are_buffered() {
     assert_eq!(s.push("```\n[[Failed]]"), "```\n");
     assert_eq!(s.flush(), "`Failed`");
 }
+
+#[test]
+fn lead_ins_are_bolded() {
+    assert_eq!(bold_lead_in("Next: run it"), "**Next:** run it");
+    assert_eq!(bold_lead_in("- Risk: data loss"), "- **Risk:** data loss");
+    assert_eq!(bold_lead_in("  fix: use a lock\n"), "  **fix:** use a lock\n");
+    assert_eq!(bold_lead_in("Nextly: nope"), "Nextly: nope");
+    assert_eq!(bold_lead_in("see Next: later"), "see Next: later");
+}

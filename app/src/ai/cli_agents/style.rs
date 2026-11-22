@@ -29,8 +29,35 @@ impl LineStyler {
             self.in_fence = !self.in_fence;
             return line.to_owned();
         }
-        if self.in_fence { line.to_owned() } else { style_line(line) }
+        if self.in_fence { line.to_owned() } else { bold_lead_in(&style_line(line)) }
     }
+}
+
+/// Labels that start a line ("Next: ...") and get bold.
+const LEAD_INS: &[&str] = &["next", "risk", "cause", "fix", "check", "finding", "note", "why", "result"];
+
+/// Whether reply styling is on. Warp-only: it only affects text Warp shows, and
+/// `WARP_CLAUDE_REPLY_STYLE=off` turns it off (including the CLI guidance).
+pub(crate) fn enabled() -> bool {
+    !std::env::var("WARP_CLAUDE_REPLY_STYLE").is_ok_and(|v| v.eq_ignore_ascii_case("off"))
+}
+
+/// Bolds a leading `Label:` such as "Next:" (also after a list marker).
+fn bold_lead_in(line: &str) -> String {
+    let trimmed = line.trim_start();
+    let indent = &line[..line.len() - trimmed.len()];
+    let (marker, rest) = match trimmed.strip_prefix(['-', '*']).filter(|r| r.starts_with(' ')) {
+        Some(r) => (&trimmed[..1], r),
+        None => ("", trimmed),
+    };
+    let rest_trim = rest.trim_start();
+    let Some(colon) = rest_trim.find(':') else { return line.to_owned() };
+    let label = &rest_trim[..colon];
+    if !LEAD_INS.iter().any(|l| label.eq_ignore_ascii_case(l)) {
+        return line.to_owned();
+    }
+    let gap = &rest[..rest.len() - rest_trim.len()];
+    format!("{indent}{marker}{gap}**{label}:**{}", &rest_trim[colon + 1..])
 }
 
 /// Replaces `[[Word]]` / `[[Word: detail]]` outside inline-code spans.
